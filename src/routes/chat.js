@@ -30,6 +30,11 @@ router.post('/:conversationId', async (req, res) => {
     return res.status(400).json({ error: 'message is required, and model must be provided in the request or set via MODEL_NAME env variable' });
   }
 
+  // Persist model on the conversation so UI can display it
+  if (!conv.model) {
+    store.updateConversation(conversationId, { model });
+  }
+
   // Persist the user message
   store.addMessage(conversationId, { role: 'user', content: message });
 

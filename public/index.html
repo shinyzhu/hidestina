@@ -612,7 +612,9 @@ async function sendMessage() {
         } else if (data.type === 'done') {
           // Final — update conversation header
           await loadConversations();
-          document.getElementById('conv-title').textContent = state.conversations.find(c => c.id === state.currentConvId)?.title || 'Chat';
+          const conv = state.conversations.find(c => c.id === state.currentConvId);
+          document.getElementById('conv-title').textContent = conv?.title || 'Chat';
+          document.getElementById('conv-model').textContent = conv?.model ? `Model: ${conv.model}` : 'No model selected';
         } else if (data.type === 'error') {
           throw new Error(data.error);
         }
@@ -697,6 +699,7 @@ function rebuildModelSelect() {
 document.getElementById('model-select').addEventListener('change', function() {
   const selected = this.options[this.selectedIndex];
   state.selectedProviderId = selected?.dataset?.providerId || null;
+  document.getElementById('conv-model').textContent = this.value ? `Model: ${this.value}` : 'No model selected';
 });
 
 document.getElementById('btn-add-llm').onclick = () => {
