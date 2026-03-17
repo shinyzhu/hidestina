@@ -24,9 +24,10 @@ router.post('/:conversationId', async (req, res) => {
   const conv = store.getConversation(conversationId);
   if (!conv) return res.status(404).json({ error: 'Conversation not found' });
 
-  const { message, providerId, model, useTools = true, options = {} } = req.body || {};
+  const { message, providerId, model: reqModel, useTools = true, options = {} } = req.body || {};
+  const model = reqModel || process.env.MODEL_NAME || '';
   if (!message || !model) {
-    return res.status(400).json({ error: 'message and model are required' });
+    return res.status(400).json({ error: 'message is required, and model must be provided in the request or set via MODEL_NAME env variable' });
   }
 
   // Persist the user message

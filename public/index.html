@@ -268,6 +268,7 @@ let state = {
   mcpServers: [],
   selectedProviderId: null,
   isStreaming: false,
+  defaultModel: '',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -629,6 +630,15 @@ async function sendMessage() {
 }
 
 // ─── LLM Providers ────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const config = await api('GET', '/config');
+    state.defaultModel = config.defaultModel || '';
+  } catch {
+    // Config endpoint unavailable, continue without defaults
+  }
+}
+
 async function loadLLMProviders() {
   state.llmProviders = await api('GET', '/llm');
   renderLLMList();
@@ -658,6 +668,15 @@ function rebuildModelSelect() {
   const sel = document.getElementById('model-select');
   const prev = sel.value;
   sel.innerHTML = '<option value="">Select model…</option>';
+
+  // Add env-based default model if set
+  if (state.defaultModel) {
+    const opt = document.createElement('option');
+    opt.value = state.defaultModel;
+    opt.textContent = state.defaultModel + ' (default)';
+    sel.appendChild(opt);
+  }
+
   for (const p of state.llmProviders) {
     const grp = document.createElement('optgroup');
     grp.label = p.name;
@@ -671,6 +690,8 @@ function rebuildModelSelect() {
     if (grp.children.length) sel.appendChild(grp);
   }
   if (prev) sel.value = prev;
+  // Auto-select default model if nothing is selected (or previous value no longer valid)
+  if (!sel.value && state.defaultModel) sel.value = state.defaultModel;
 }
 
 document.getElementById('model-select').addEventListener('change', function() {
@@ -828,7 +849,7 @@ async function refreshMCPServer(id) {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   initTheme();
-  await Promise.all([loadConversations(), loadLLMProviders(), loadMCPServers()]);
+  await Promise.all([loadConfig(), loadConversations(), loadLLMProviders(), loadMCPServers()]);
 }
 
 init().catch(err => toast(err.message, 'error'));

@@ -1,10 +1,10 @@
 'use strict';
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
 
 const conversationsRouter = require('./routes/conversations');
 const chatRouter = require('./routes/chat');
@@ -55,6 +55,13 @@ app.use('/api/mcp', apiLimiter, mcpRouter);
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
+});
+
+// ── Config (env-based defaults) ───────────────────────────────────────────────
+app.get('/api/config', apiLimiter, (req, res) => {
+  res.json({
+    defaultModel: process.env.MODEL_NAME || '',
+  });
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
