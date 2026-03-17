@@ -22,7 +22,9 @@ async function getOrConnectClient(serverId) {
   // Build transport options with optional Bearer token auth
   const transportOpts = {};
   if (server.authToken) {
-    const headers = { Authorization: `Bearer ${server.authToken}` };
+    // Sanitize token to prevent header injection (strip CR/LF characters)
+    const safeToken = server.authToken.replace(/[\r\n]/g, '');
+    const headers = { Authorization: `Bearer ${safeToken}` };
     transportOpts.requestInit = { headers };
     transportOpts.eventSourceInit = { headers };
   }
