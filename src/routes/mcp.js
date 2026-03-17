@@ -13,11 +13,11 @@ router.get('/', (req, res) => {
 
 // POST /api/mcp
 router.post('/', (req, res) => {
-  const { name, url, description, enabled } = req.body || {};
+  const { name, url, description, enabled, authToken } = req.body || {};
   if (!name || !url) {
     return res.status(400).json({ error: 'name and url are required' });
   }
-  const server = store.createMCPServer({ name, url, description, enabled });
+  const server = store.createMCPServer({ name, url, description, enabled, authToken });
   res.status(201).json(server);
 });
 
@@ -30,6 +30,7 @@ router.get('/:id', (req, res) => {
 
 // PATCH /api/mcp/:id
 router.patch('/:id', (req, res) => {
+  mcpService.disconnectClient(req.params.id);
   const updated = store.updateMCPServer(req.params.id, req.body);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(200).json(updated);
