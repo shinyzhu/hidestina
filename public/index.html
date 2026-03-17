@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vduck — AI Chat</title>
+
+  <!-- Tailwind CSS (locally compiled) -->
+  <link rel="stylesheet" href="/js/tailwind.css" />
+  <script>
+    /* Tailwind v4 dark mode via class strategy */
+  </script>
+
+  <!-- marked.js for Markdown (local) -->
+  <script src="/js/marked.min.js"></script>
+  <!-- highlight.js for code (local) -->
+  <link rel="stylesheet" href="/js/github-dark.min.css" />
+  <script src="/js/highlight.min.js"></script>
+
+  <style>
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3a4561; border-radius: 4px; }
+
+    /* Prose reset for chat messages */
+    .prose-chat { color: #d1d5db; font-size: 0.9375rem; line-height: 1.7; }
+    .prose-chat p { margin: 0 0 0.75em; }
+    .prose-chat p:last-child { margin-bottom: 0; }
+    .prose-chat pre { background: #0d1117; border: 1px solid #30363d; border-radius: 0.5rem; padding: 1rem; overflow-x: auto; margin: 0.75em 0; }
+    .prose-chat code { background: #21262d; padding: 0.125em 0.35em; border-radius: 0.25rem; font-size: 0.85em; color: #e6edf3; }
+    .prose-chat pre code { background: transparent; padding: 0; }
+    .prose-chat ul, .prose-chat ol { padding-left: 1.5em; margin: 0.5em 0; }
+    .prose-chat li { margin: 0.25em 0; }
+    .prose-chat a { color: #7c6aff; text-decoration: underline; }
+    .prose-chat h1, .prose-chat h2, .prose-chat h3 { font-weight: 600; color: #f0f0f0; margin: 0.75em 0 0.5em; }
+    .prose-chat h1 { font-size: 1.3em; }
+    .prose-chat h2 { font-size: 1.15em; }
+    .prose-chat h3 { font-size: 1.05em; }
+    .prose-chat blockquote { border-left: 3px solid #7c6aff; padding-left: 0.75em; color: #9ca3af; margin: 0.5em 0; }
+    .prose-chat table { width: 100%; border-collapse: collapse; margin: 0.5em 0; }
+    .prose-chat th, .prose-chat td { border: 1px solid #30363d; padding: 0.4em 0.75em; }
+    .prose-chat th { background: #161b27; color: #e2e8f0; }
+
+    /* Typing indicator */
+    .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #7c6aff; margin: 0 2px; animation: pulseDot 1.4s ease-in-out infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Input auto-grow */
+    #chat-input { resize: none; min-height: 48px; max-height: 220px; overflow-y: auto; }
+
+    /* Tool badge */
+    .tool-badge { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.15em 0.55em; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; }
+
+    /* Sidebar active conversation */
+    .conv-item.active { background: #1e2536; border-left-color: #7c6aff; }
+    .conv-item { border-left: 2px solid transparent; }
+
+    /* Custom scrollable areas */
+    .scroll-area { overflow-y: auto; }
+  </style>
+</head>
+<body class="bg-[#0f1117] text-gray-200 flex h-screen overflow-hidden font-sans antialiased">
+
+<!-- ─── SIDEBAR ─────────────────────────────────────────────────────────────── -->
+<aside id="sidebar" class="flex flex-col w-64 min-w-[200px] max-w-xs bg-[#161b27] border-r border-[#252d3d] transition-all duration-200 select-none">
+  <!-- Logo -->
+  <div class="flex items-center gap-2.5 px-4 py-4 border-b border-[#252d3d]">
+    <span class="text-2xl">🦆</span>
+    <span class="font-bold text-lg tracking-tight text-white">vduck</span>
+    <button id="btn-theme" title="Toggle theme" class="ml-auto text-gray-400 hover:text-white transition-colors text-lg">☀️</button>
+  </div>
+
+  <!-- New chat -->
+  <div class="px-3 pt-3">
+    <button id="btn-new-chat" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white font-semibold text-sm transition-colors shadow-lg shadow-accent/20">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      New Chat
+    </button>
+  </div>
+
+  <!-- Conversation list -->
+  <div class="flex-1 scroll-area px-2 py-2 mt-1" id="conv-list">
+    <div class="text-xs text-gray-500 px-2 pb-1 font-semibold uppercase tracking-wider">Conversations</div>
+    <div id="conv-items" class="space-y-0.5"></div>
+  </div>
+
+  <!-- Settings tabs -->
+  <div class="border-t border-[#252d3d]">
+    <div class="flex text-xs font-semibold">
+      <button data-tab="llm" class="settings-tab flex-1 px-2 py-2.5 text-gray-400 hover:text-white transition-colors border-b-2 border-transparent" title="LLM Providers">
+        🤖 LLMs
+      </button>
+      <button data-tab="mcp" class="settings-tab flex-1 px-2 py-2.5 text-gray-400 hover:text-white transition-colors border-b-2 border-transparent" title="MCP Servers">
+        🔧 MCP
+      </button>
+    </div>
+    <!-- LLM panel -->
+    <div id="tab-llm" class="settings-panel hidden p-3 scroll-area max-h-72">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">LLM Providers</span>
+        <button id="btn-add-llm" class="text-accent hover:text-accent-light text-lg leading-none" title="Add provider">＋</button>
+      </div>
+      <div id="llm-list" class="space-y-1.5"></div>
+    </div>
+    <!-- MCP panel -->
+    <div id="tab-mcp" class="settings-panel hidden p-3 scroll-area max-h-72">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">MCP Servers</span>
+        <button id="btn-add-mcp" class="text-accent hover:text-accent-light text-lg leading-none" title="Add MCP server">＋</button>
+      </div>
+      <div id="mcp-list" class="space-y-1.5"></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ─── MAIN AREA ─────────────────────────────────────────────────────────────── -->
+<main class="flex flex-col flex-1 min-w-0 h-screen">
+  <!-- Top bar -->
+  <header class="flex items-center gap-3 px-5 py-3 border-b border-[#252d3d] bg-[#161b27]/80 backdrop-blur">
+    <div class="flex-1 min-w-0">
+      <div id="conv-title" class="font-semibold text-white truncate">Select or start a chat</div>
+      <div id="conv-model" class="text-xs text-gray-500 truncate">No model selected</div>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- Model selector -->
+      <div class="relative">
+        <select id="model-select" class="appearance-none bg-[#252d3d] border border-[#30363d] text-gray-200 text-sm rounded-lg px-3 py-1.5 pr-7 focus:outline-none focus:border-accent transition-colors">
+          <option value="">Select model…</option>
+        </select>
+        <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</div>
+      </div>
+      <!-- Tools toggle -->
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-gray-400 hover:text-white transition-colors select-none" title="Enable/disable MCP tools">
+        <input type="checkbox" id="tools-toggle" class="w-4 h-4 rounded accent-accent" checked />
+        <span>Tools</span>
+      </label>
+      <!-- Delete conv -->
+      <button id="btn-delete-conv" class="hidden text-gray-500 hover:text-red-400 transition-colors p-1 rounded" title="Delete conversation">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  <div class="flex-1 overflow-y-auto px-4 py-6" id="messages-area">
+    <div id="messages-container" class="max-w-3xl mx-auto space-y-5"></div>
+    <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center">
+      <div class="text-5xl mb-4">🦆</div>
+      <h2 class="text-xl font-bold text-white mb-2">Welcome to vduck</h2>
+      <p class="text-gray-400 text-sm max-w-sm">Start a new conversation, configure your LLM provider and optional MCP tools in the sidebar.</p>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="px-4 pb-4 pt-2 border-t border-[#252d3d] bg-[#161b27]/80 backdrop-blur">
+    <div id="typing-indicator" class="hidden flex items-center gap-2 mb-2 ml-1 text-xs text-gray-500">
+      <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+      <span class="ml-1">Thinking…</span>
+    </div>
+    <div class="max-w-3xl mx-auto flex gap-2 items-end bg-[#1e2536] border border-[#30363d] rounded-2xl px-4 py-2 focus-within:border-accent transition-colors shadow-lg">
+      <textarea
+        id="chat-input"
+        placeholder="Message vduck… (Enter to send, Shift+Enter for newline)"
+        class="flex-1 bg-transparent text-gray-200 placeholder-gray-600 text-sm outline-none leading-relaxed py-1"
+        rows="1"
+      ></textarea>
+      <button id="btn-send" class="flex-shrink-0 p-1.5 rounded-xl bg-accent hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white" title="Send">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+      </button>
+    </div>
+    <p class="text-center text-xs text-gray-600 mt-1.5">vduck may make mistakes. Verify important info.</p>
+  </div>
+</main>
+
+<!-- ─── MODALS ─────────────────────────────────────────────────────────────── -->
+<!-- Generic modal backdrop -->
+<div id="modal-backdrop" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-40 animate-fade-in" onclick="closeModal()"></div>
+
+<!-- LLM Provider Modal -->
+<div id="modal-llm" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-slide-up">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
+      <h3 id="modal-llm-title" class="font-semibold text-white text-lg">Add LLM Provider</h3>
+      <button onclick="closeModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
+    </div>
+    <form id="form-llm" class="px-6 py-4 space-y-4" onsubmit="saveLLMProvider(event)">
+      <input type="hidden" id="llm-id" />
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Name *</label>
+        <input id="llm-name" type="text" required placeholder="e.g. OpenAI, Ollama, DeepSeek…"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Base URL *</label>
+        <input id="llm-baseurl" type="url" required placeholder="https://api.openai.com/v1"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">API Key</label>
+        <input id="llm-apikey" type="password" placeholder="sk-… (leave blank if not required)"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Default Model</label>
+        <input id="llm-model" type="text" placeholder="gpt-4o, llama3, deepseek-chat…"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Description</label>
+        <input id="llm-desc" type="text" placeholder="Optional note"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
+        <button type="button" onclick="closeModal()" class="flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MCP Server Modal -->
+<div id="modal-mcp" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-slide-up">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
+      <h3 id="modal-mcp-title" class="font-semibold text-white text-lg">Add MCP Server</h3>
+      <button onclick="closeModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
+    </div>
+    <form id="form-mcp" class="px-6 py-4 space-y-4" onsubmit="saveMCPServer(event)">
+      <input type="hidden" id="mcp-id" />
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Name *</label>
+        <input id="mcp-name" type="text" required placeholder="e.g. File System, Web Search…"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Server URL *</label>
+        <input id="mcp-url" type="url" required placeholder="http://localhost:3001/mcp"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Description</label>
+        <input id="mcp-desc" type="text" placeholder="What does this server provide?"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="mcp-enabled" checked class="w-4 h-4 rounded accent-accent" />
+        <label for="mcp-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
+        <button type="button" onclick="closeModal()" class="flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-[100] space-y-2"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let state = {
+  conversations: [],
+  currentConvId: null,
+  llmProviders: [],
+  mcpServers: [],
+  selectedProviderId: null,
+  isStreaming: false,
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  if (res.status === 204) return null;
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  const colors = { info: 'bg-[#252d3d]', success: 'bg-green-800/90', error: 'bg-red-800/90' };
+  el.className = `px-4 py-2.5 rounded-xl text-sm text-white shadow-xl animate-slide-up ${colors[type] || colors.info}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+marked.setOptions({
+  highlight: (code, lang) => {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  },
+  breaks: true,
+  gfm: true,
+});
+
+function renderMarkdown(text) {
+  return marked.parse(text || '');
+}
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('vduck-theme') || 'dark';
+  document.documentElement.classList.toggle('dark', saved === 'dark');
+  document.getElementById('btn-theme').textContent = saved === 'dark' ? '☀️' : '🌙';
+}
+document.getElementById('btn-theme').onclick = () => {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('vduck-theme', isDark ? 'dark' : 'light');
+  document.getElementById('btn-theme').textContent = isDark ? '☀️' : '🌙';
+};
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById('modal-backdrop').classList.remove('hidden');
+  document.getElementById('modal-' + id).classList.remove('hidden');
+}
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.add('hidden');
+  document.querySelectorAll('[id^="modal-"]').forEach(m => {
+    if (m.id !== 'modal-backdrop') m.classList.add('hidden');
+  });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ─── Settings tabs ────────────────────────────────────────────────────────────
+document.querySelectorAll('.settings-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.settings-tab').forEach(b => {
+      b.classList.toggle('text-white', b.dataset.tab === tab);
+      b.classList.toggle('border-accent', b.dataset.tab === tab);
+      b.classList.toggle('text-gray-400', b.dataset.tab !== tab);
+      b.classList.toggle('border-transparent', b.dataset.tab !== tab);
+    });
+    document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('tab-' + tab).classList.remove('hidden');
+  });
+});
+
+// ─── Conversations ────────────────────────────────────────────────────────────
+async function loadConversations() {
+  state.conversations = await api('GET', '/conversations');
+  renderConversationList();
+}
+
+function renderConversationList() {
+  const container = document.getElementById('conv-items');
+  if (!state.conversations.length) {
+    container.innerHTML = '<div class="text-xs text-gray-600 px-2 py-1">No conversations yet</div>';
+    return;
+  }
+  container.innerHTML = state.conversations.map(c => `
+    <div class="conv-item group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer hover:bg-[#1e2536] transition-colors ${c.id === state.currentConvId ? 'active' : ''}"
+         onclick="selectConversation('${c.id}')">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-gray-200 truncate group-hover:text-white">${escapeHtml(c.title || 'New Chat')}</div>
+        <div class="text-xs text-gray-500">${c.messageCount} msg${c.messageCount !== 1 ? 's' : ''}</div>
+      </div>
+      <button class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all p-1 rounded flex-shrink-0"
+              onclick="event.stopPropagation(); deleteConversation('${c.id}')" title="Delete">×</button>
+    </div>
+  `).join('');
+}
+
+async function selectConversation(id) {
+  state.currentConvId = id;
+  const conv = await api('GET', `/conversations/${id}`);
+  renderConversationList();
+  renderMessages(conv.messages);
+  document.getElementById('conv-title').textContent = conv.title || 'New Chat';
+  document.getElementById('conv-model').textContent = conv.model ? `Model: ${conv.model}` : 'No model selected';
+  document.getElementById('btn-delete-conv').classList.remove('hidden');
+  document.getElementById('empty-state').style.display = 'none';
+  scrollToBottom();
+}
+
+async function createNewConversation() {
+  const conv = await api('POST', '/conversations', { title: 'New Chat' });
+  state.conversations.unshift(conv);
+  renderConversationList();
+  await selectConversation(conv.id);
+}
+
+async function deleteConversation(id) {
+  if (!confirm('Delete this conversation?')) return;
+  await api('DELETE', `/conversations/${id}`);
+  state.conversations = state.conversations.filter(c => c.id !== id);
+  if (state.currentConvId === id) {
+    state.currentConvId = null;
+    document.getElementById('messages-container').innerHTML = '';
+    document.getElementById('empty-state').style.display = '';
+    document.getElementById('conv-title').textContent = 'Select or start a chat';
+    document.getElementById('conv-model').textContent = 'No model selected';
+    document.getElementById('btn-delete-conv').classList.add('hidden');
+  }
+  renderConversationList();
+  toast('Conversation deleted', 'info');
+}
+
+document.getElementById('btn-new-chat').onclick = createNewConversation;
+document.getElementById('btn-delete-conv').onclick = () => deleteConversation(state.currentConvId);
+
+// ─── Messages ─────────────────────────────────────────────────────────────────
+function renderMessages(messages) {
+  const container = document.getElementById('messages-container');
+  container.innerHTML = '';
+  for (const msg of messages) {
+    appendMessage(msg);
+  }
+}
+
+function appendMessage(msg) {
+  const container = document.getElementById('messages-container');
+  const el = createMessageEl(msg);
+  container.appendChild(el);
+  return el;
+}
+
+function createMessageEl(msg) {
+  const wrap = document.createElement('div');
+
+  if (msg.role === 'user') {
+    wrap.className = 'flex justify-end';
+    wrap.innerHTML = `
+      <div class="max-w-[80%] bg-accent/20 border border-accent/30 rounded-2xl rounded-br-md px-4 py-3">
+        <div class="text-sm text-gray-200 whitespace-pre-wrap">${escapeHtml(msg.content || '')}</div>
+      </div>`;
+  } else if (msg.role === 'assistant') {
+    wrap.className = 'flex gap-3 animate-fade-in';
+    wrap.innerHTML = `
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-sm mt-0.5">🦆</div>
+      <div class="flex-1 min-w-0">
+        <div class="prose-chat">${msg.content ? renderMarkdown(msg.content) : ''}</div>
+        ${renderToolCalls(msg.toolCalls)}
+      </div>`;
+  } else if (msg.role === 'tool') {
+    wrap.className = 'flex gap-3 animate-fade-in';
+    wrap.innerHTML = `
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-green-900/40 flex items-center justify-center text-sm mt-0.5">🔧</div>
+      <div class="flex-1 min-w-0">
+        <div class="bg-[#1e2536] border border-[#30363d] rounded-xl p-3 text-xs">
+          <div class="font-semibold text-green-400 mb-1">Tool Result</div>
+          <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(msg.content || '')}</pre>
+        </div>
+      </div>`;
+  }
+
+  return wrap;
+}
+
+function renderToolCalls(toolCalls) {
+  if (!toolCalls || toolCalls.length === 0) return '';
+  return toolCalls.map(tc => `
+    <div class="mt-2 bg-[#1e2536] border border-[#30363d] rounded-xl p-3 text-xs">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Tool Call</span>
+        <code class="text-purple-300 font-mono">${escapeHtml(tc.function?.name || '')}</code>
+      </div>
+      <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+        (() => { try { return JSON.stringify(JSON.parse(tc.function?.arguments || '{}'), null, 2); } catch { return tc.function?.arguments || ''; } })()
+      )}</pre>
+    </div>
+  `).join('');
+}
+
+function scrollToBottom() {
+  const area = document.getElementById('messages-area');
+  area.scrollTop = area.scrollHeight;
+}
+
+// ─── Chat Input ───────────────────────────────────────────────────────────────
+const chatInput = document.getElementById('chat-input');
+const btnSend = document.getElementById('btn-send');
+
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 220) + 'px';
+});
+
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+btnSend.onclick = sendMessage;
+
+async function sendMessage() {
+  if (state.isStreaming) return;
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  // Require a conversation
+  if (!state.currentConvId) {
+    await createNewConversation();
+  }
+
+  // Require a model
+  const model = document.getElementById('model-select').value;
+  if (!model) {
+    toast('Please select a model first', 'error');
+    return;
+  }
+
+  const useTools = document.getElementById('tools-toggle').checked;
+
+  // Clear input
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+  document.getElementById('empty-state').style.display = 'none';
+
+  // Append user message
+  appendMessage({ role: 'user', content: text });
+  scrollToBottom();
+
+  // Show typing indicator
+  const typingEl = document.getElementById('typing-indicator');
+  typingEl.classList.remove('hidden');
+  state.isStreaming = true;
+  btnSend.disabled = true;
+
+  // Create assistant bubble
+  const assistantEl = document.createElement('div');
+  assistantEl.className = 'flex gap-3 animate-fade-in';
+  assistantEl.innerHTML = `
+    <div class="flex-shrink-0 w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-sm mt-0.5">🦆</div>
+    <div class="flex-1 min-w-0">
+      <div class="prose-chat assistant-content"></div>
+      <div class="tool-events"></div>
+    </div>`;
+  document.getElementById('messages-container').appendChild(assistantEl);
+  const contentEl = assistantEl.querySelector('.assistant-content');
+  const toolEventsEl = assistantEl.querySelector('.tool-events');
+  scrollToBottom();
+
+  let accumulated = '';
+
+  try {
+    const providerId = state.selectedProviderId || undefined;
+    const resp = await fetch(`/api/chat/${state.currentConvId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, providerId, model, useTools }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'Request failed');
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = JSON.parse(line.slice(6));
+
+        if (data.type === 'delta') {
+          accumulated += data.content;
+          contentEl.innerHTML = renderMarkdown(accumulated);
+          hljs.highlightAll();
+          scrollToBottom();
+        } else if (data.type === 'tool_call') {
+          const tcEl = document.createElement('div');
+          tcEl.className = 'mt-2 bg-[#1e2536] border border-purple-900/50 rounded-xl p-3 text-xs animate-fade-in';
+          tcEl.dataset.tcid = data.toolCall.id;
+          const args = (() => { try { return JSON.stringify(JSON.parse(data.toolCall.arguments || '{}'), null, 2); } catch { return data.toolCall.arguments || ''; } })();
+          tcEl.innerHTML = `
+            <div class="flex items-center gap-2 mb-1">
+              <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Calling</span>
+              <code class="text-purple-300 font-mono">${escapeHtml(data.toolCall.name)}</code>
+            </div>
+            <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(args)}</pre>
+            <div class="tool-result-area mt-1"></div>`;
+          toolEventsEl.appendChild(tcEl);
+          scrollToBottom();
+        } else if (data.type === 'tool_result') {
+          const tcEl = toolEventsEl.querySelector(`[data-tcid="${data.toolCallId}"]`);
+          if (tcEl) {
+            const resultArea = tcEl.querySelector('.tool-result-area');
+            const resultStr = typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2);
+            resultArea.innerHTML = `<div class="text-green-400 font-semibold mt-1 mb-0.5">Result:</div><pre class="text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-40">${escapeHtml(resultStr)}</pre>`;
+            // Update badge
+            const badge = tcEl.querySelector('.tool-badge');
+            if (badge) { badge.textContent = '✅ Done'; badge.className = 'tool-badge bg-green-900/50 text-green-300'; }
+            // Reset for next round
+            accumulated = '';
+          }
+          scrollToBottom();
+        } else if (data.type === 'done') {
+          // Final — update conversation header
+          await loadConversations();
+          document.getElementById('conv-title').textContent = state.conversations.find(c => c.id === state.currentConvId)?.title || 'Chat';
+        } else if (data.type === 'error') {
+          throw new Error(data.error);
+        }
+      }
+    }
+  } catch (err) {
+    contentEl.innerHTML = `<div class="text-red-400 text-sm">❌ ${escapeHtml(err.message)}</div>`;
+    toast(err.message, 'error');
+  } finally {
+    typingEl.classList.add('hidden');
+    state.isStreaming = false;
+    btnSend.disabled = false;
+    scrollToBottom();
+  }
+}
+
+// ─── LLM Providers ────────────────────────────────────────────────────────────
+async function loadLLMProviders() {
+  state.llmProviders = await api('GET', '/llm');
+  renderLLMList();
+  rebuildModelSelect();
+}
+
+function renderLLMList() {
+  const container = document.getElementById('llm-list');
+  if (!state.llmProviders.length) {
+    container.innerHTML = '<div class="text-xs text-gray-600">No providers yet. Click ＋ to add one.</div>';
+    return;
+  }
+  container.innerHTML = state.llmProviders.map(p => `
+    <div class="bg-[#252d3d] rounded-xl p-2.5 text-xs group">
+      <div class="flex items-center gap-1.5">
+        <span class="flex-1 font-semibold text-gray-200 truncate">${escapeHtml(p.name)}</span>
+        <button onclick="editLLMProvider('${p.id}')" class="text-gray-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100" title="Edit">✏️</button>
+        <button onclick="deleteLLMProvider('${p.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
+      </div>
+      <div class="text-gray-500 truncate mt-0.5">${escapeHtml(p.baseURL)}</div>
+      ${p.defaultModel ? `<div class="text-gray-600 mt-0.5">Default: ${escapeHtml(p.defaultModel)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function rebuildModelSelect() {
+  const sel = document.getElementById('model-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Select model…</option>';
+  for (const p of state.llmProviders) {
+    const grp = document.createElement('optgroup');
+    grp.label = p.name;
+    if (p.defaultModel) {
+      const opt = document.createElement('option');
+      opt.value = p.defaultModel;
+      opt.dataset.providerId = p.id;
+      opt.textContent = p.defaultModel;
+      grp.appendChild(opt);
+    }
+    if (grp.children.length) sel.appendChild(grp);
+  }
+  if (prev) sel.value = prev;
+}
+
+document.getElementById('model-select').addEventListener('change', function() {
+  const selected = this.options[this.selectedIndex];
+  state.selectedProviderId = selected?.dataset?.providerId || null;
+});
+
+document.getElementById('btn-add-llm').onclick = () => {
+  document.getElementById('llm-id').value = '';
+  document.getElementById('llm-name').value = '';
+  document.getElementById('llm-baseurl').value = '';
+  document.getElementById('llm-apikey').value = '';
+  document.getElementById('llm-model').value = '';
+  document.getElementById('llm-desc').value = '';
+  document.getElementById('modal-llm-title').textContent = 'Add LLM Provider';
+  openModal('llm');
+};
+
+async function editLLMProvider(id) {
+  const p = state.llmProviders.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('llm-id').value = p.id;
+  document.getElementById('llm-name').value = p.name;
+  document.getElementById('llm-baseurl').value = p.baseURL;
+  document.getElementById('llm-apikey').value = '';  // Don't expose masked key
+  document.getElementById('llm-model').value = p.defaultModel || '';
+  document.getElementById('llm-desc').value = p.description || '';
+  document.getElementById('modal-llm-title').textContent = 'Edit LLM Provider';
+  openModal('llm');
+}
+
+async function saveLLMProvider(e) {
+  e.preventDefault();
+  const id = document.getElementById('llm-id').value;
+  const payload = {
+    name: document.getElementById('llm-name').value.trim(),
+    baseURL: document.getElementById('llm-baseurl').value.trim(),
+    apiKey: document.getElementById('llm-apikey').value.trim() || undefined,
+    defaultModel: document.getElementById('llm-model').value.trim(),
+    description: document.getElementById('llm-desc').value.trim(),
+  };
+  try {
+    if (id) {
+      await api('PATCH', `/llm/${id}`, payload);
+      toast('Provider updated', 'success');
+    } else {
+      await api('POST', '/llm', payload);
+      toast('Provider added', 'success');
+    }
+    closeModal();
+    await loadLLMProviders();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteLLMProvider(id) {
+  if (!confirm('Delete this LLM provider?')) return;
+  await api('DELETE', `/llm/${id}`);
+  toast('Provider deleted', 'info');
+  await loadLLMProviders();
+}
+
+// ─── MCP Servers ──────────────────────────────────────────────────────────────
+async function loadMCPServers() {
+  state.mcpServers = await api('GET', '/mcp');
+  renderMCPList();
+}
+
+function renderMCPList() {
+  const container = document.getElementById('mcp-list');
+  if (!state.mcpServers.length) {
+    container.innerHTML = '<div class="text-xs text-gray-600">No MCP servers. Click ＋ to add one.</div>';
+    return;
+  }
+  container.innerHTML = state.mcpServers.map(s => `
+    <div class="bg-[#252d3d] rounded-xl p-2.5 text-xs group">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full flex-shrink-0 ${s.enabled ? 'bg-green-400' : 'bg-gray-600'}"></span>
+        <span class="flex-1 font-semibold text-gray-200 truncate">${escapeHtml(s.name)}</span>
+        <button onclick="refreshMCPServer('${s.id}')" class="text-gray-500 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100 text-sm" title="Refresh tools">⟳</button>
+        <button onclick="editMCPServer('${s.id}')" class="text-gray-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100" title="Edit">✏️</button>
+        <button onclick="deleteMCPServer('${s.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
+      </div>
+      <div class="text-gray-500 truncate mt-0.5">${escapeHtml(s.url)}</div>
+      ${s.tools?.length ? `<div class="text-gray-600 mt-0.5">${s.tools.length} tool${s.tools.length !== 1 ? 's' : ''}: ${s.tools.slice(0,3).map(t=>escapeHtml(t.name||'')).join(', ')}${s.tools.length>3?'…':''}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+document.getElementById('btn-add-mcp').onclick = () => {
+  document.getElementById('mcp-id').value = '';
+  document.getElementById('mcp-name').value = '';
+  document.getElementById('mcp-url').value = '';
+  document.getElementById('mcp-desc').value = '';
+  document.getElementById('mcp-enabled').checked = true;
+  document.getElementById('modal-mcp-title').textContent = 'Add MCP Server';
+  openModal('mcp');
+};
+
+async function editMCPServer(id) {
+  const s = state.mcpServers.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('mcp-id').value = s.id;
+  document.getElementById('mcp-name').value = s.name;
+  document.getElementById('mcp-url').value = s.url;
+  document.getElementById('mcp-desc').value = s.description || '';
+  document.getElementById('mcp-enabled').checked = s.enabled;
+  document.getElementById('modal-mcp-title').textContent = 'Edit MCP Server';
+  openModal('mcp');
+}
+
+async function saveMCPServer(e) {
+  e.preventDefault();
+  const id = document.getElementById('mcp-id').value;
+  const payload = {
+    name: document.getElementById('mcp-name').value.trim(),
+    url: document.getElementById('mcp-url').value.trim(),
+    description: document.getElementById('mcp-desc').value.trim(),
+    enabled: document.getElementById('mcp-enabled').checked,
+  };
+  try {
+    if (id) {
+      await api('PATCH', `/mcp/${id}`, payload);
+      toast('MCP server updated', 'success');
+    } else {
+      await api('POST', '/mcp', payload);
+      toast('MCP server added', 'success');
+    }
+    closeModal();
+    await loadMCPServers();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteMCPServer(id) {
+  if (!confirm('Delete this MCP server?')) return;
+  await api('DELETE', `/mcp/${id}`);
+  toast('MCP server deleted', 'info');
+  await loadMCPServers();
+}
+
+async function refreshMCPServer(id) {
+  try {
+    toast('Refreshing tools…', 'info');
+    await api('POST', `/mcp/${id}/refresh`);
+    await loadMCPServers();
+    toast('Tools refreshed', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  initTheme();
+  await Promise.all([loadConversations(), loadLLMProviders(), loadMCPServers()]);
+}
+
+init().catch(err => toast(err.message, 'error'));
+</script>
+</body>
+</html>
