@@ -875,11 +875,20 @@ async function deleteMCPServer(id) {
 function handleSkillFileSelect(input) {
   const file = input.files[0];
   if (!file) return;
+  if (file.size > 512 * 1024) {
+    toast('Skill file must be under 512 KB', 'error');
+    input.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = function(e) {
     document.getElementById('mcp-skill-content').value = e.target.result;
     document.getElementById('mcp-skill-filename').textContent = file.name;
     document.getElementById('mcp-skill-clear').classList.remove('hidden');
+  };
+  reader.onerror = function() {
+    toast('Failed to read skill file', 'error');
+    input.value = '';
   };
   reader.readAsText(file);
 }
