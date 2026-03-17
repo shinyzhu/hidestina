@@ -69,6 +69,18 @@ router.post('/:conversationId', async (req, res) => {
       }
     }
 
+    // Inject skill instructions from enabled MCP servers as system messages
+    const enabledServers = store.listMCPServers().filter((s) => s.enabled && s.skill);
+    if (enabledServers.length > 0) {
+      const skillContent = enabledServers
+        .map((s) => `## ${s.name}\n\n${s.skill}`)
+        .join('\n\n---\n\n');
+      messages.unshift({
+        role: 'system',
+        content: `The following are skill instructions for the available MCP servers:\n\n${skillContent}`,
+      });
+    }
+
     let assistantMessage = null;
 
     // Agentic loop: allow multiple tool call rounds

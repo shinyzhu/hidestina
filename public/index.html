@@ -253,6 +253,17 @@
         <input type="checkbox" id="mcp-enabled" checked class="w-4 h-4 rounded accent-accent" />
         <label for="mcp-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
       </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Skill File (.md)</label>
+        <div class="flex items-center gap-2">
+          <label class="flex-1 flex items-center gap-2 bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-400 cursor-pointer hover:border-accent transition-colors">
+            <span id="mcp-skill-filename" class="truncate">No file chosen</span>
+            <input type="file" id="mcp-skill-file" accept=".md,text/markdown" class="hidden" onchange="handleSkillFileSelect(this)" />
+          </label>
+          <button type="button" id="mcp-skill-clear" class="hidden text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded" onclick="clearSkillFile()">Clear</button>
+        </div>
+        <input type="hidden" id="mcp-skill-content" />
+      </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
         <button type="button" onclick="closeModal()" class="flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">Cancel</button>
@@ -785,6 +796,7 @@ function renderMCPList() {
         <button onclick="deleteMCPServer('${s.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
       </div>
       <div class="text-gray-500 truncate mt-0.5">${escapeHtml(s.url)}</div>
+      ${s.skill ? '<div class="text-blue-400 mt-0.5">📄 Skill loaded</div>' : ''}
       ${s.tools?.length ? `<div class="text-gray-600 mt-0.5">${s.tools.length} tool${s.tools.length !== 1 ? 's' : ''}: ${s.tools.slice(0,3).map(t=>escapeHtml(t.name||'')).join(', ')}${s.tools.length>3?'…':''}</div>` : ''}
     </div>
   `).join('');
@@ -797,6 +809,10 @@ document.getElementById('btn-add-mcp').onclick = () => {
   document.getElementById('mcp-desc').value = '';
   document.getElementById('mcp-auth-token').value = '';
   document.getElementById('mcp-enabled').checked = true;
+  document.getElementById('mcp-skill-content').value = '';
+  document.getElementById('mcp-skill-file').value = '';
+  document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
+  document.getElementById('mcp-skill-clear').classList.add('hidden');
   document.getElementById('modal-mcp-title').textContent = 'Add MCP Server';
   openModal('mcp');
 };
@@ -810,6 +826,15 @@ async function editMCPServer(id) {
   document.getElementById('mcp-desc').value = s.description || '';
   document.getElementById('mcp-auth-token').value = s.authToken || '';
   document.getElementById('mcp-enabled').checked = s.enabled;
+  document.getElementById('mcp-skill-content').value = s.skill || '';
+  document.getElementById('mcp-skill-file').value = '';
+  if (s.skill) {
+    document.getElementById('mcp-skill-filename').textContent = 'skill.md (loaded)';
+    document.getElementById('mcp-skill-clear').classList.remove('hidden');
+  } else {
+    document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
+    document.getElementById('mcp-skill-clear').classList.add('hidden');
+  }
   document.getElementById('modal-mcp-title').textContent = 'Edit MCP Server';
   openModal('mcp');
 }
@@ -823,6 +848,7 @@ async function saveMCPServer(e) {
     description: document.getElementById('mcp-desc').value.trim(),
     authToken: document.getElementById('mcp-auth-token').value.trim(),
     enabled: document.getElementById('mcp-enabled').checked,
+    skill: document.getElementById('mcp-skill-content').value,
   };
   try {
     if (id) {
@@ -844,6 +870,25 @@ async function deleteMCPServer(id) {
   await api('DELETE', `/mcp/${id}`);
   toast('MCP server deleted', 'info');
   await loadMCPServers();
+}
+
+function handleSkillFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('mcp-skill-content').value = e.target.result;
+    document.getElementById('mcp-skill-filename').textContent = file.name;
+    document.getElementById('mcp-skill-clear').classList.remove('hidden');
+  };
+  reader.readAsText(file);
+}
+
+function clearSkillFile() {
+  document.getElementById('mcp-skill-content').value = '';
+  document.getElementById('mcp-skill-file').value = '';
+  document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
+  document.getElementById('mcp-skill-clear').classList.add('hidden');
 }
 
 async function refreshMCPServer(id) {

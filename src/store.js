@@ -166,7 +166,7 @@ function getMCPServer(id) {
   return store.mcpServers.find((s) => s.id === id) || null;
 }
 
-function createMCPServer({ name, url, description = '', enabled = true, authToken = '' }) {
+function createMCPServer({ name, url, description = '', enabled = true, authToken = '', skill = '' }) {
   const server = {
     id: uuidv4(),
     name,
@@ -174,6 +174,7 @@ function createMCPServer({ name, url, description = '', enabled = true, authToke
     description,
     enabled,
     authToken,
+    skill,
     tools: [],
     createdAt: new Date().toISOString(),
   };

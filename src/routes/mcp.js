@@ -13,11 +13,11 @@ router.get('/', (req, res) => {
 
 // POST /api/mcp
 router.post('/', (req, res) => {
-  const { name, url, description, enabled, authToken } = req.body || {};
+  const { name, url, description, enabled, authToken, skill } = req.body || {};
   if (!name || !url) {
     return res.status(400).json({ error: 'name and url are required' });
   }
-  const server = store.createMCPServer({ name, url, description, enabled, authToken });
+  const server = store.createMCPServer({ name, url, description, enabled, authToken, skill });
   res.status(201).json(server);
 });
 
