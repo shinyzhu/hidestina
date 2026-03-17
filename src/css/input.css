@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-accent: #7c6aff;
+  --color-accent-light: #a78bfa;
+  --color-accent-dark: #5b4fcf;
+  --animate-fade-in: fadeIn 0.2s ease;
+  --animate-slide-up: slideUp 0.25s ease;
+  --animate-pulse-dot: pulseDot 1.4s ease-in-out infinite;
+  --keyframes-fadeIn-from-opacity: 0;
+  --keyframes-fadeIn-to-opacity: 1;
+  --keyframes-slideUp-from-opacity: 0;
+  --keyframes-slideUp-from-transform: translateY(8px);
+  --keyframes-slideUp-to-opacity: 1;
+  --keyframes-slideUp-to-transform: translateY(0);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

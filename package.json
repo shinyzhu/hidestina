@@ -1,0 +1,36 @@
+{
+  "name": "vduck",
+  "version": "1.0.0",
+  "description": "A modern chat UI for custom LLMs and MCP tools",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "build:css": "tailwindcss --input src/css/input.css --output public/js/tailwind.css --content public/index.html --minify",
+    "build": "npm run build:css"
+  },
+  "keywords": [
+    "chat",
+    "llm",
+    "mcp",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "express-rate-limit": "^8.3.1",
+    "openai": "^4.104.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@highlightjs/cdn-assets": "^11.11.1",
+    "@tailwindcss/cli": "^4.2.1",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.4",
+    "tailwindcss": "^4.2.1"
+  }
+}
