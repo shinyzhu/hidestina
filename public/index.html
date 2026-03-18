@@ -1028,8 +1028,9 @@ function onMcpServerToggle(e) {
   }
 
   // If all are selected, set back to null (default)
-  if (state.enabledMcpServerIds.length === enabledServers.length &&
-      enabledServers.every(s => state.enabledMcpServerIds.includes(s.id))) {
+  const selectedSet = new Set(state.enabledMcpServerIds);
+  if (selectedSet.size === enabledServers.length &&
+      enabledServers.every(s => selectedSet.has(s.id))) {
     state.enabledMcpServerIds = null;
   }
 

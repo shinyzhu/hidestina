@@ -35,8 +35,12 @@ router.post('/:conversationId', async (req, res) => {
   const convUpdates = {};
   if (model && model !== conv.model) convUpdates.model = model;
   if (effectiveProviderId && effectiveProviderId !== conv.providerId) convUpdates.providerId = effectiveProviderId;
-  if (enabledMcpServers !== undefined && JSON.stringify(enabledMcpServers) !== JSON.stringify(conv.enabledMcpServers)) {
-    convUpdates.enabledMcpServers = enabledMcpServers;
+  if (enabledMcpServers !== undefined) {
+    const prev = conv.enabledMcpServers;
+    const changed = enabledMcpServers === null !== (prev === null || prev === undefined) ||
+      (Array.isArray(enabledMcpServers) && Array.isArray(prev) &&
+        (enabledMcpServers.length !== prev.length || enabledMcpServers.some((id, i) => id !== prev[i])));
+    if (changed) convUpdates.enabledMcpServers = enabledMcpServers;
   }
   if (Object.keys(convUpdates).length > 0) {
     store.updateConversation(conversationId, convUpdates);
