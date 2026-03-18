@@ -1,4 +1,4 @@
-# DestinaAI
+# HiDestina
 
 A modern, beautiful Express chat application for conversing with **custom LLMs** and using **custom MCP tools**.
 
@@ -55,7 +55,7 @@ Click the **⟳** icon next to a server to discover its tools.
 ## Architecture
 
 ```
-DestinaAI/
+HiDestina/
 ├── src/
 │   ├── server.js              # Express entry point
 │   ├── store.js               # JSON file-backed store

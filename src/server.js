@@ -64,7 +64,7 @@ app.get('/{*path}', staticLimiter, (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✈️ DestinaAI running at http://localhost:${PORT}`);
+  console.log(`✈️ HiDestina running at http://localhost:${PORT}`);
 });
 
 module.exports = app;
