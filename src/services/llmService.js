@@ -50,6 +50,8 @@ async function streamCompletion({ providerId, model, messages, tools, options = 
     params.tool_choice = 'auto';
   }
 
+  console.log('Starting streamCompletion with params:', { providerId, model, messages, tools, options });
+
   const stream = await client.chat.completions.create(params);
 
   let fullContent = '';
@@ -83,7 +85,7 @@ async function streamCompletion({ providerId, model, messages, tools, options = 
 
   onDone && onDone({
     role: 'assistant',
-    content: fullContent || null,
+    content: fullContent,
     toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
   });
 }
@@ -98,8 +100,15 @@ async function complete({ providerId, model, messages, tools, options = {} }) {
     params.tools = tools;
     params.tool_choice = 'auto';
   }
+
+  console.log('Starting complete with params:', { providerId, model, messages, tools, options });
+
   const resp = await client.chat.completions.create(params);
-  return resp.choices[0].message;
+  const message = resp.choices[0].message;
+  if (message && (message.content === null || message.content === undefined)) {
+    message.content = '';
+  }
+  return message;
 }
 
 /**

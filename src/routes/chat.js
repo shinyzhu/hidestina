@@ -62,7 +62,10 @@ router.post('/:conversationId', async (req, res) => {
   try {
     // Build message history
     const messages = conv.messages.map((m) => {
-      const msg = { role: m.role, content: m.content };
+      const msg = {
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : '',
+      };
       if (m.toolCalls) msg.tool_calls = m.toolCalls;
       if (m.toolCallId) msg.tool_call_id = m.toolCallId;
       if (m.name) msg.name = m.name;
@@ -124,12 +127,14 @@ router.post('/:conversationId', async (req, res) => {
       if (!done) break;
 
       const { toolCalls } = assistantMessage;
+      const assistantContent = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
+      assistantMessage.content = assistantContent;
 
       if (!toolCalls || toolCalls.length === 0) {
         // No tool calls → final answer
         store.addMessage(conversationId, {
           role: 'assistant',
-          content: assistantMessage.content,
+          content: assistantContent,
         });
         send({ type: 'done', message: assistantMessage });
         break;
@@ -138,7 +143,7 @@ router.post('/:conversationId', async (req, res) => {
       // Persist assistant message with tool calls
       store.addMessage(conversationId, {
         role: 'assistant',
-        content: assistantMessage.content,
+        content: assistantContent,
         toolCalls: toolCalls.map((tc) => ({
           id: tc.id,
           type: 'function',
@@ -148,7 +153,7 @@ router.post('/:conversationId', async (req, res) => {
 
       messages.push({
         role: 'assistant',
-        content: assistantMessage.content,
+        content: assistantContent,
         tool_calls: toolCalls.map((tc) => ({
           id: tc.id,
           type: 'function',
