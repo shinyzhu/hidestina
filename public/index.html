@@ -57,6 +57,14 @@
     /* Tool badge */
     .tool-badge { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.15em 0.55em; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; }
 
+    /* Collapsible tool call */
+    .tool-call-header { cursor: pointer; user-select: none; }
+    .tool-call-header .chevron { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; color: #6b7280; margin-left: auto; }
+    .tool-call-header .chevron.open { transform: rotate(90deg); }
+    .tool-call-body { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s ease; }
+    .tool-call-body.collapsed { max-height: 0; opacity: 0; margin-top: 0; }
+    .tool-call-body.expanded { max-height: 2000px; opacity: 1; margin-top: 0.25rem; }
+
     /* Sidebar active conversation */
     .conv-item.active { background: #1e2536; border-left-color: #7c6aff; }
     .conv-item { border-left: 2px solid transparent; }
@@ -581,8 +589,13 @@ function createMessageEl(msg) {
       <div class="flex-shrink-0 w-7 h-7 rounded-full bg-green-900/40 flex items-center justify-center text-sm mt-0.5">🔧</div>
       <div class="flex-1 min-w-0">
         <div class="bg-[#1e2536] border border-[#30363d] rounded-xl p-3 text-xs">
-          <div class="font-semibold text-green-400 mb-1">Tool Result</div>
-          <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(msg.content || '')}</pre>
+          <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
+            <span class="font-semibold text-green-400">Tool Result</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="tool-call-body collapsed">
+            <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(msg.content || '')}</pre>
+          </div>
         </div>
       </div>`;
   }
@@ -590,17 +603,35 @@ function createMessageEl(msg) {
   return wrap;
 }
 
+function toggleToolCall(headerEl) {
+  const body = headerEl.nextElementSibling;
+  const chevron = headerEl.querySelector('.chevron');
+  if (!body) return;
+  if (body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    body.classList.add('expanded');
+    if (chevron) chevron.classList.add('open');
+  } else {
+    body.classList.remove('expanded');
+    body.classList.add('collapsed');
+    if (chevron) chevron.classList.remove('open');
+  }
+}
+
 function renderToolCalls(toolCalls) {
   if (!toolCalls || toolCalls.length === 0) return '';
   return toolCalls.map(tc => `
     <div class="mt-2 bg-[#1e2536] border border-[#30363d] rounded-xl p-3 text-xs">
-      <div class="flex items-center gap-2 mb-1">
+      <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
         <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Tool Call</span>
         <code class="text-purple-300 font-mono">${escapeHtml(tc.function?.name || '')}</code>
+        <span class="chevron">▶</span>
       </div>
-      <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
-        (() => { try { return JSON.stringify(JSON.parse(tc.function?.arguments || '{}'), null, 2); } catch { return tc.function?.arguments || ''; } })()
-      )}</pre>
+      <div class="tool-call-body collapsed">
+        <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
+          (() => { try { return JSON.stringify(JSON.parse(tc.function?.arguments || '{}'), null, 2); } catch { return tc.function?.arguments || ''; } })()
+        )}</pre>
+      </div>
     </div>
   `).join('');
 }
@@ -718,12 +749,15 @@ async function sendMessage() {
           tcEl.dataset.tcid = data.toolCall.id;
           const args = (() => { try { return JSON.stringify(JSON.parse(data.toolCall.arguments || '{}'), null, 2); } catch { return data.toolCall.arguments || ''; } })();
           tcEl.innerHTML = `
-            <div class="flex items-center gap-2 mb-1">
+            <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
               <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Calling</span>
               <code class="text-purple-300 font-mono">${escapeHtml(data.toolCall.name)}</code>
+              <span class="chevron open">▶</span>
             </div>
-            <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(args)}</pre>
-            <div class="tool-result-area mt-1"></div>`;
+            <div class="tool-call-body expanded">
+              <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(args)}</pre>
+              <div class="tool-result-area mt-1"></div>
+            </div>`;
           toolEventsEl.appendChild(tcEl);
           scrollToBottom();
         } else if (data.type === 'tool_result') {
@@ -735,6 +769,11 @@ async function sendMessage() {
             // Update badge
             const badge = tcEl.querySelector('.tool-badge');
             if (badge) { badge.textContent = '✅ Done'; badge.className = 'tool-badge bg-green-900/50 text-green-300'; }
+            // Auto-collapse after result arrives
+            const body = tcEl.querySelector('.tool-call-body');
+            const chevron = tcEl.querySelector('.chevron');
+            if (body) { body.classList.remove('expanded'); body.classList.add('collapsed'); }
+            if (chevron) { chevron.classList.remove('open'); }
             // Reset for next round
             accumulated = '';
           }
