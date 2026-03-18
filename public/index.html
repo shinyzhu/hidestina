@@ -8,7 +8,11 @@
   <!-- Tailwind CSS (locally compiled) -->
   <link rel="stylesheet" href="/js/tailwind.css" />
   <script>
-    /* Tailwind v4 dark mode via class strategy */
+    /* Apply saved theme immediately to avoid flash of wrong theme */
+    (function() {
+      var savedTheme = localStorage.getItem('hidestina-theme') || 'dark';
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    })();
   </script>
 
   <!-- marked.js for Markdown (local) -->
@@ -59,6 +63,61 @@
 
     /* Custom scrollable areas */
     .scroll-area { overflow-y: auto; }
+
+    /* ── Light mode overrides ─────────────────────────────────────────
+       Unlayered <style> rules always beat Tailwind's @layer utilities.
+       All html:not(.dark) rules apply when dark class is absent.
+    ─────────────────────────────────────────────────────────────────── */
+    html:not(.dark) body                                     { background-color: #f8fafc; color: #1e293b; }
+
+    /* Backgrounds */
+    html:not(.dark) .bg-\[\#0f1117\]                         { background-color: #f8fafc; }
+    html:not(.dark) .bg-\[\#161b27\]                         { background-color: #ffffff; }
+    html:not(.dark) .bg-\[\#161b27\]\/80                     { background-color: rgba(255,255,255,0.85); }
+    html:not(.dark) .bg-\[\#1e2536\]                         { background-color: #f1f5f9; }
+    html:not(.dark) .bg-\[\#252d3d\]                         { background-color: #e8edf5; }
+    html:not(.dark) .hover\:bg-\[\#1e2536\]:hover            { background-color: #e8edf5; }
+    html:not(.dark) .hover\:bg-\[\#252d3d\]:hover            { background-color: #e2e8f0; }
+    html:not(.dark) .hover\:bg-\[\#30363d\]:hover            { background-color: #d1dae7; }
+
+    /* Borders */
+    html:not(.dark) .border-\[\#252d3d\]                     { border-color: #e2e8f0; }
+    html:not(.dark) .border-\[\#30363d\]                     { border-color: #cbd5e1; }
+
+    /* Text — body text and headings on surface backgrounds */
+    html:not(.dark) .text-gray-200                           { color: #1e293b; }
+    html:not(.dark) .text-gray-300                           { color: #374151; }
+    html:not(.dark) .text-white                              { color: #0f172a; }
+    html:not(.dark) .hover\:text-white:hover                 { color: #0f172a; }
+    html:not(.dark) .group:hover .group-hover\:text-white    { color: #0f172a; }
+
+    /* Restore white text on intentionally coloured backgrounds */
+    html:not(.dark) .bg-accent.text-white,
+    html:not(.dark) .bg-accent-dark.text-white               { color: #ffffff; }
+    html:not(.dark) .bg-green-800\/90,
+    html:not(.dark) .bg-red-800\/90                          { color: #ffffff; }
+
+    /* Sidebar active conversation */
+    html:not(.dark) .conv-item.active                        { background: #e8edf5; }
+
+    /* Scrollbar */
+    html:not(.dark) ::-webkit-scrollbar-thumb               { background: #c4c9d4; }
+
+    /* Code blocks — override highlight.js dark background */
+    html:not(.dark) .hljs                                    { background: #f6f8fa; color: #24292e; }
+
+    /* Prose chat (AI messages) */
+    html:not(.dark) .prose-chat                              { color: #1e293b; }
+    html:not(.dark) .prose-chat pre                          { background: #f6f8fa; border-color: #e2e8f0; }
+    html:not(.dark) .prose-chat code                         { background: #f0f4f8; color: #374151; }
+    html:not(.dark) .prose-chat pre code                     { background: transparent; color: inherit; }
+    html:not(.dark) .prose-chat h1,
+    html:not(.dark) .prose-chat h2,
+    html:not(.dark) .prose-chat h3                           { color: #0f172a; }
+    html:not(.dark) .prose-chat blockquote                   { color: #64748b; }
+    html:not(.dark) .prose-chat th                           { background: #e8edf5; color: #1e293b; }
+    html:not(.dark) .prose-chat th,
+    html:not(.dark) .prose-chat td                           { border-color: #e2e8f0; }
   </style>
 </head>
 <body class="bg-[#0f1117] text-gray-200 flex h-screen overflow-hidden font-sans antialiased">
