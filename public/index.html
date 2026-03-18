@@ -124,11 +124,6 @@
       <div id="conv-model" class="text-xs text-gray-500 truncate">No model selected</div>
     </div>
     <div class="flex items-center gap-2">
-      <!-- Provider selector -->
-      <select id="provider-select" title="Select LLM provider"
-        class="bg-[#252d3d] border border-[#30363d] text-gray-200 text-sm rounded-lg px-2 py-1.5 w-36 focus:outline-none focus:border-accent transition-colors">
-        <option value="">Default</option>
-      </select>
       <!-- Model selector -->
       <select id="model-input" title="Select model"
         class="bg-[#252d3d] border border-[#30363d] text-gray-200 text-sm rounded-lg px-2 py-1.5 w-44 focus:outline-none focus:border-accent transition-colors">
@@ -651,22 +646,8 @@ async function loadLLMProviders() {
   renderLLMList();
   // Auto-select first provider if available
   state.selectedProviderId = state.llmProviders.length > 0 ? state.llmProviders[0].id : null;
-  renderProviderSelect();
   fetchModelsForProvider(state.selectedProviderId);
 }
-
-function renderProviderSelect() {
-  const sel = document.getElementById('provider-select');
-  sel.innerHTML = '<option value="">Default</option>' +
-    state.llmProviders.map(p =>
-      `<option value="${p.id}" ${p.id === state.selectedProviderId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-    ).join('');
-}
-
-document.getElementById('provider-select').addEventListener('change', function () {
-  state.selectedProviderId = this.value || null;
-  fetchModelsForProvider(state.selectedProviderId);
-});
 
 async function fetchModelsForProvider(providerId) {
   const sel = document.getElementById('model-input');
