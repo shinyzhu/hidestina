@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DestinaAI — AI Chat</title>
+  <title>HiDestina — AI Chat</title>
 
   <!-- Tailwind CSS (locally compiled) -->
   <link rel="stylesheet" href="/js/tailwind.css" />
@@ -68,7 +68,7 @@
   <!-- Logo -->
   <div class="flex items-center gap-2.5 px-4 py-4 border-b border-[#252d3d]">
     <span class="text-2xl">✈️</span>
-    <span class="font-bold text-lg tracking-tight text-white">DestinaAI</span>
+    <span class="font-bold text-lg tracking-tight text-white">HiDestina</span>
     <button id="btn-theme" title="Toggle theme" class="ml-auto text-gray-400 hover:text-white transition-colors text-lg">☀️</button>
   </div>
 
@@ -146,7 +146,7 @@
     <div id="messages-container" class="max-w-3xl mx-auto space-y-5"></div>
     <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center">
       <div class="text-5xl mb-4">✈️</div>
-      <h2 class="text-xl font-bold text-white mb-2">Welcome to DestinaAI</h2>
+      <h2 class="text-xl font-bold text-white mb-2">Welcome to HiDestina</h2>
       <p class="text-gray-400 text-sm max-w-sm">Start a new conversation, configure your LLM provider and optional MCP tools in the sidebar.</p>
     </div>
   </div>
@@ -160,7 +160,7 @@
     <div class="max-w-3xl mx-auto flex gap-2 items-end bg-[#1e2536] border border-[#30363d] rounded-2xl px-4 py-2 focus-within:border-accent transition-colors shadow-lg">
       <textarea
         id="chat-input"
-        placeholder="Message DestinaAI… (Enter to send, Shift+Enter for newline)"
+        placeholder="Message HiDestina… (Enter to send, Shift+Enter for newline)"
         class="flex-1 bg-transparent text-gray-200 placeholder-gray-600 text-sm outline-none leading-relaxed py-1"
         rows="1"
       ></textarea>
@@ -168,7 +168,7 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
       </button>
     </div>
-    <p class="text-center text-xs text-gray-600 mt-1.5">DestinaAI may make mistakes. Verify important info.</p>
+    <p class="text-center text-xs text-gray-600 mt-1.5">HiDestina may make mistakes. Verify important info.</p>
   </div>
 </main>
 
@@ -198,6 +198,11 @@
       <div>
         <label class="block text-xs font-semibold text-gray-400 mb-1">API Key</label>
         <input id="llm-apikey" type="password" placeholder="sk-… (leave blank if not required)"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Model *</label>
+        <input id="llm-model" type="text" required placeholder="e.g. gpt-4o, deepseek-chat, llama3…"
           class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
       </div>
       <div>
@@ -320,13 +325,13 @@ function renderMarkdown(text) {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 function initTheme() {
-  const saved = localStorage.getItem('destinaai-theme') || 'dark';
+  const saved = localStorage.getItem('hidestina-theme') || 'dark';
   document.documentElement.classList.toggle('dark', saved === 'dark');
   document.getElementById('btn-theme').textContent = saved === 'dark' ? '☀️' : '🌙';
 }
 document.getElementById('btn-theme').onclick = () => {
   const isDark = document.documentElement.classList.toggle('dark');
-  localStorage.setItem('destinaai-theme', isDark ? 'dark' : 'light');
+  localStorage.setItem('hidestina-theme', isDark ? 'dark' : 'light');
   document.getElementById('btn-theme').textContent = isDark ? '☀️' : '🌙';
 };
 
@@ -644,29 +649,24 @@ async function sendMessage() {
 async function loadLLMProviders() {
   state.llmProviders = await api('GET', '/llm');
   renderLLMList();
-  // Auto-select first provider if available
-  state.selectedProviderId = state.llmProviders.length > 0 ? state.llmProviders[0].id : null;
-  fetchModelsForProvider(state.selectedProviderId);
+  populateModelDropdown();
 }
 
-async function fetchModelsForProvider(providerId) {
+function populateModelDropdown() {
   const sel = document.getElementById('model-input');
-  sel.innerHTML = '<option value="">Loading models…</option>';
-  const endpoint = providerId ? `/llm/${providerId}/models` : '/llm/default/models';
-  try {
-    const models = await api('GET', endpoint);
-    if (models.length) {
-      sel.innerHTML = models.map((m, i) => `<option value="${escapeHtml(m.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(m.id)}</option>`).join('');
-      // Auto-select first model and update header label
-      document.getElementById('conv-model').textContent = `Model: ${models[0].id}`;
-    } else {
-      sel.innerHTML = '<option value="">No models available</option>';
-      document.getElementById('conv-model').textContent = 'No model selected';
-    }
-  } catch {
-    sel.innerHTML = '<option value="">Failed to load models</option>';
+  if (!state.llmProviders.length) {
+    sel.innerHTML = '<option value="">No LLMs added yet</option>';
     document.getElementById('conv-model').textContent = 'No model selected';
+    state.selectedProviderId = null;
+    return;
   }
+  sel.innerHTML = state.llmProviders.map((p, i) =>
+    `<option value="${escapeHtml(p.model || p.name)}" data-provider-id="${escapeHtml(p.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(p.name)}${p.model ? ' (' + escapeHtml(p.model) + ')' : ''}</option>`
+  ).join('');
+  // Auto-select first provider
+  const first = state.llmProviders[0];
+  state.selectedProviderId = first.id;
+  document.getElementById('conv-model').textContent = `Model: ${first.model || first.name}`;
 }
 
 function renderLLMList() {
@@ -688,6 +688,9 @@ function renderLLMList() {
 }
 
 document.getElementById('model-input').addEventListener('change', function() {
+  const selected = this.options[this.selectedIndex];
+  const providerId = selected ? selected.dataset.providerId : null;
+  state.selectedProviderId = providerId || null;
   document.getElementById('conv-model').textContent = this.value ? `Model: ${this.value}` : 'No model selected';
 });
 
@@ -696,6 +699,7 @@ document.getElementById('btn-add-llm').onclick = () => {
   document.getElementById('llm-name').value = '';
   document.getElementById('llm-baseurl').value = '';
   document.getElementById('llm-apikey').value = '';
+  document.getElementById('llm-model').value = '';
   document.getElementById('llm-desc').value = '';
   document.getElementById('modal-llm-title').textContent = 'Add LLM Provider';
   openModal('llm');
@@ -708,6 +712,7 @@ async function editLLMProvider(id) {
   document.getElementById('llm-name').value = p.name;
   document.getElementById('llm-baseurl').value = p.baseURL;
   document.getElementById('llm-apikey').value = '';  // Don't expose masked key
+  document.getElementById('llm-model').value = p.model || '';
   document.getElementById('llm-desc').value = p.description || '';
   document.getElementById('modal-llm-title').textContent = 'Edit LLM Provider';
   openModal('llm');
@@ -720,6 +725,7 @@ async function saveLLMProvider(e) {
     name: document.getElementById('llm-name').value.trim(),
     baseURL: document.getElementById('llm-baseurl').value.trim(),
     apiKey: document.getElementById('llm-apikey').value.trim() || undefined,
+    model: document.getElementById('llm-model').value.trim(),
     description: document.getElementById('llm-desc').value.trim(),
   };
   try {
