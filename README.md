@@ -1,4 +1,4 @@
-# vduck
+# DestinaAI
 
 A modern, beautiful Express chat application for conversing with **custom LLMs** and using **custom MCP tools**.
 
@@ -37,7 +37,6 @@ Click **🤖 LLMs** in the sidebar → **＋** to add a provider.
 | Name | OpenAI |
 | Base URL | `https://api.openai.com/v1` |
 | API Key | `sk-…` |
-| Default Model | `gpt-4o` |
 
 **Works with**: OpenAI, Azure OpenAI, Anthropic (via proxy), Ollama (`http://localhost:11434/v1`), LM Studio, DeepSeek, Groq, Together AI, and any OpenAI-compatible endpoint.
 
@@ -56,7 +55,7 @@ Click the **⟳** icon next to a server to discover its tools.
 ## Architecture
 
 ```
-vduck/
+DestinaAI/
 ├── src/
 │   ├── server.js              # Express entry point
 │   ├── store.js               # JSON file-backed store

@@ -1,5 +1,5 @@
 {
-  "name": "vduck",
+  "name": "destinaai",
   "version": "1.0.0",
   "description": "A modern chat UI for custom LLMs and MCP tools",
   "main": "src/server.js",

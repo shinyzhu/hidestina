@@ -57,13 +57,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
 
-// ── Config (env-based defaults) ───────────────────────────────────────────────
-app.get('/api/config', apiLimiter, (req, res) => {
-  res.json({
-    defaultModel: process.env.MODEL_NAME || '',
-  });
-});
-
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('/{*path}', staticLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
@@ -71,7 +64,7 @@ app.get('/{*path}', staticLimiter, (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🦆 vduck running at http://localhost:${PORT}`);
+  console.log(`✈️ DestinaAI running at http://localhost:${PORT}`);
 });
 
 module.exports = app;

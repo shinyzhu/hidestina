@@ -17,7 +17,7 @@ async function getOrConnectClient(serverId) {
   if (!server) throw new Error(`MCP server "${serverId}" not found`);
   if (!server.enabled) throw new Error(`MCP server "${server.name}" is disabled`);
 
-  const client = new Client({ name: 'vduck', version: '1.0.0' });
+  const client = new Client({ name: 'DestinaAI', version: '1.0.0' });
 
   // Build transport options with optional Bearer token auth
   const transportOpts = {};

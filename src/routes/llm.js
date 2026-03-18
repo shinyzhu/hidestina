@@ -17,11 +17,11 @@ router.get('/', (req, res) => {
 
 // POST /api/llm
 router.post('/', (req, res) => {
-  const { name, baseURL, apiKey, defaultModel, description } = req.body || {};
+  const { name, baseURL, apiKey, description } = req.body || {};
   if (!name || !baseURL) {
     return res.status(400).json({ error: 'name and baseURL are required' });
   }
-  const provider = store.createLLMProvider({ name, baseURL, apiKey, defaultModel, description });
+  const provider = store.createLLMProvider({ name, baseURL, apiKey, description });
   res.status(201).json({ ...provider, apiKey: provider.apiKey ? '***' : '' });
 });
 
