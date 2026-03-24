@@ -13,10 +13,15 @@ router.get('/', (req, res) => {
 // POST /api/skills
 router.post('/', (req, res) => {
   const { name, content, description, enabled } = req.body || {};
-  if (!name) {
+  if (!name || typeof name !== 'string') {
     return res.status(400).json({ error: 'name is required' });
   }
-  const skill = store.createSkill({ name, content, description, enabled });
+  const skill = store.createSkill({
+    name,
+    content: typeof content === 'string' ? content : '',
+    description: typeof description === 'string' ? description : '',
+    enabled: typeof enabled === 'boolean' ? enabled : true,
+  });
   res.status(201).json(skill);
 });
 
@@ -29,7 +34,13 @@ router.get('/:id', (req, res) => {
 
 // PATCH /api/skills/:id
 router.patch('/:id', (req, res) => {
-  const updated = store.updateSkill(req.params.id, req.body);
+  const { name, content, description, enabled } = req.body || {};
+  const updates = {};
+  if (typeof name === 'string') updates.name = name;
+  if (typeof content === 'string') updates.content = content;
+  if (typeof description === 'string') updates.description = description;
+  if (typeof enabled === 'boolean') updates.enabled = enabled;
+  const updated = store.updateSkill(req.params.id, updates);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(200).json(updated);
 });

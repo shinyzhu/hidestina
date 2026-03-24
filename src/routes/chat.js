@@ -44,7 +44,7 @@ router.post('/:conversationId', async (req, res) => {
   }
   if (enabledSkills !== undefined) {
     const prev = conv.enabledSkills;
-    const changed = enabledSkills === null !== (prev === null || prev === undefined) ||
+    const changed = (enabledSkills === null) !== (prev === null || prev === undefined) ||
       (Array.isArray(enabledSkills) && Array.isArray(prev) &&
         (enabledSkills.length !== prev.length || enabledSkills.some((id, i) => id !== prev[i])));
     if (changed) convUpdates.enabledSkills = enabledSkills;
