@@ -162,6 +162,9 @@
       <button data-tab="mcp" class="settings-tab flex-1 px-2 py-2.5 text-gray-400 hover:text-white transition-colors border-b-2 border-transparent" title="MCP Servers">
         🔧 MCP
       </button>
+      <button data-tab="skills" class="settings-tab flex-1 px-2 py-2.5 text-gray-400 hover:text-white transition-colors border-b-2 border-transparent" title="Skills">
+        📝 Skills
+      </button>
     </div>
     <!-- LLM panel -->
     <div id="tab-llm" class="settings-panel hidden p-3 scroll-area max-h-72">
@@ -178,6 +181,14 @@
         <button id="btn-add-mcp" class="text-accent hover:text-accent-light text-lg leading-none" title="Add MCP server">＋</button>
       </div>
       <div id="mcp-list" class="space-y-1.5"></div>
+    </div>
+    <!-- Skills panel -->
+    <div id="tab-skills" class="settings-panel hidden p-3 scroll-area max-h-72">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Skills</span>
+        <button id="btn-add-skill" class="text-accent hover:text-accent-light text-lg leading-none" title="Add skill">＋</button>
+      </div>
+      <div id="skills-list" class="space-y-1.5"></div>
     </div>
   </div>
 </aside>
@@ -243,6 +254,19 @@
         <div id="tools-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-72 bg-[#1e2536] border border-[#30363d] rounded-xl shadow-2xl z-30 py-1 max-h-64 overflow-y-auto">
           <div id="tools-dropdown-items" class="text-xs"></div>
           <div id="tools-dropdown-empty" class="px-3 py-2 text-xs text-gray-600">No MCP servers configured</div>
+        </div>
+      </div>
+      <!-- Skills toggle dropdown -->
+      <div class="relative" id="skills-dropdown-wrap">
+        <button type="button" id="skills-toggle-btn" title="Select skills for this chat"
+          class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors select-none bg-[#252d3d] border border-[#30363d] rounded-lg px-2 py-1 focus:outline-none focus:border-accent">
+          <span>📝</span>
+          <span id="skills-toggle-label">Skills</span>
+          <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="skills-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-72 bg-[#1e2536] border border-[#30363d] rounded-xl shadow-2xl z-30 py-1 max-h-64 overflow-y-auto">
+          <div id="skills-dropdown-items" class="text-xs"></div>
+          <div id="skills-dropdown-empty" class="px-3 py-2 text-xs text-gray-600">No skills configured</div>
         </div>
       </div>
     </div>
@@ -329,16 +353,47 @@
         <input type="checkbox" id="mcp-enabled" checked class="w-4 h-4 rounded accent-accent" />
         <label for="mcp-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
       </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
+        <button type="button" onclick="closeModal()" class="flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Skill Modal -->
+<div id="modal-skill" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-slide-up">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
+      <h3 id="modal-skill-title" class="font-semibold text-white text-lg">Add Skill</h3>
+      <button onclick="closeModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
+    </div>
+    <form id="form-skill" class="px-6 py-4 space-y-4" onsubmit="saveSkill(event)">
+      <input type="hidden" id="skill-id" />
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Name *</label>
+        <input id="skill-name" type="text" required placeholder="e.g. Code Review, Writing Style…"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Description</label>
+        <input id="skill-desc" type="text" placeholder="What does this skill do?"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="skill-enabled" checked class="w-4 h-4 rounded accent-accent" />
+        <label for="skill-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
+      </div>
       <div>
         <label class="block text-xs font-semibold text-gray-400 mb-1">Skill File (.md)</label>
         <div class="flex items-center gap-2">
           <label class="flex-1 flex items-center gap-2 bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-400 cursor-pointer hover:border-accent transition-colors">
-            <span id="mcp-skill-filename" class="truncate">No file chosen</span>
-            <input type="file" id="mcp-skill-file" accept=".md,text/markdown" class="hidden" onchange="handleSkillFileSelect(this)" />
+            <span id="skill-file-label" class="truncate">No file chosen</span>
+            <input type="file" id="skill-file-input" accept=".md,text/markdown" class="hidden" onchange="handleSkillFileUpload(this)" />
           </label>
-          <button type="button" id="mcp-skill-clear" class="hidden text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded" onclick="clearSkillFile()">Clear</button>
+          <button type="button" id="skill-file-clear" class="hidden text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded" onclick="clearSkillFileUpload()">Clear</button>
         </div>
-        <input type="hidden" id="mcp-skill-content" />
+        <input type="hidden" id="skill-content" />
       </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
@@ -358,8 +413,10 @@ let state = {
   currentConvId: null,
   llmProviders: [],
   mcpServers: [],
+  skills: [],
   selectedProviderId: null,
   enabledMcpServerIds: null, // null = all enabled servers; array = specific IDs
+  enabledSkillIds: null, // null = all enabled skills; array = specific IDs
   isStreaming: false,
 };
 
@@ -483,6 +540,9 @@ async function selectConversation(id) {
   // Restore MCP server selections for this conversation
   restoreMcpSelection(conv);
 
+  // Restore skill selections for this conversation
+  restoreSkillSelection(conv);
+
   scrollToBottom();
 }
 
@@ -521,11 +581,22 @@ function restoreMcpSelection(conv) {
   renderToolsDropdown();
 }
 
+function restoreSkillSelection(conv) {
+  if (Array.isArray(conv.enabledSkills)) {
+    state.enabledSkillIds = [...conv.enabledSkills];
+  } else {
+    // null means all enabled skills (default)
+    state.enabledSkillIds = null;
+  }
+  renderSkillsDropdown();
+}
+
 async function createNewConversation() {
   const model = document.getElementById('model-input').value || '';
   const providerId = state.selectedProviderId || '';
   const enabledMcpServers = state.enabledMcpServerIds;
-  const conv = await api('POST', '/conversations', { title: 'New Chat', model, providerId, enabledMcpServers });
+  const enabledSkills = state.enabledSkillIds;
+  const conv = await api('POST', '/conversations', { title: 'New Chat', model, providerId, enabledMcpServers, enabledSkills });
   state.conversations.unshift(conv);
   renderConversationList();
   await selectConversation(conv.id);
@@ -678,6 +749,7 @@ async function sendMessage() {
 
   const useTools = getSelectedMcpServerIds().length > 0;
   const enabledMcpServers = state.enabledMcpServerIds;
+  const enabledSkills = state.enabledSkillIds;
 
   // Clear input
   chatInput.value = '';
@@ -715,7 +787,7 @@ async function sendMessage() {
     const resp = await fetch(`/api/chat/${state.currentConvId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, providerId, model, useTools, enabledMcpServers }),
+      body: JSON.stringify({ message: text, providerId, model, useTools, enabledMcpServers, enabledSkills }),
     });
 
     if (!resp.ok) {
@@ -937,7 +1009,6 @@ function renderMCPList() {
         <button onclick="deleteMCPServer('${s.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
       </div>
       <div class="text-gray-500 truncate mt-0.5">${escapeHtml(s.url)}</div>
-      ${s.skill ? '<div class="text-blue-400 mt-0.5">📄 Skill loaded</div>' : ''}
       ${s.tools?.length ? `<div class="text-gray-600 mt-0.5">${s.tools.length} tool${s.tools.length !== 1 ? 's' : ''}: ${s.tools.slice(0,3).map(t=>escapeHtml(t.name||'')).join(', ')}${s.tools.length>3?'…':''}</div>` : ''}
     </div>
   `).join('');
@@ -950,10 +1021,6 @@ document.getElementById('btn-add-mcp').onclick = () => {
   document.getElementById('mcp-desc').value = '';
   document.getElementById('mcp-auth-token').value = '';
   document.getElementById('mcp-enabled').checked = true;
-  document.getElementById('mcp-skill-content').value = '';
-  document.getElementById('mcp-skill-file').value = '';
-  document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
-  document.getElementById('mcp-skill-clear').classList.add('hidden');
   document.getElementById('modal-mcp-title').textContent = 'Add MCP Server';
   openModal('mcp');
 };
@@ -967,15 +1034,6 @@ async function editMCPServer(id) {
   document.getElementById('mcp-desc').value = s.description || '';
   document.getElementById('mcp-auth-token').value = s.authToken || '';
   document.getElementById('mcp-enabled').checked = s.enabled;
-  document.getElementById('mcp-skill-content').value = s.skill || '';
-  document.getElementById('mcp-skill-file').value = '';
-  if (s.skill) {
-    document.getElementById('mcp-skill-filename').textContent = 'skill.md (loaded)';
-    document.getElementById('mcp-skill-clear').classList.remove('hidden');
-  } else {
-    document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
-    document.getElementById('mcp-skill-clear').classList.add('hidden');
-  }
   document.getElementById('modal-mcp-title').textContent = 'Edit MCP Server';
   openModal('mcp');
 }
@@ -989,7 +1047,6 @@ async function saveMCPServer(e) {
     description: document.getElementById('mcp-desc').value.trim(),
     authToken: document.getElementById('mcp-auth-token').value.trim(),
     enabled: document.getElementById('mcp-enabled').checked,
-    skill: document.getElementById('mcp-skill-content').value,
   };
   try {
     if (id) {
@@ -1013,7 +1070,7 @@ async function deleteMCPServer(id) {
   await loadMCPServers();
 }
 
-function handleSkillFileSelect(input) {
+function handleSkillFileUpload(input) {
   const file = input.files[0];
   if (!file) return;
   if (file.size > 512 * 1024) {
@@ -1023,9 +1080,9 @@ function handleSkillFileSelect(input) {
   }
   const reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById('mcp-skill-content').value = e.target.result;
-    document.getElementById('mcp-skill-filename').textContent = file.name;
-    document.getElementById('mcp-skill-clear').classList.remove('hidden');
+    document.getElementById('skill-content').value = e.target.result;
+    document.getElementById('skill-file-label').textContent = file.name;
+    document.getElementById('skill-file-clear').classList.remove('hidden');
   };
   reader.onerror = function() {
     toast('Failed to read skill file', 'error');
@@ -1034,11 +1091,11 @@ function handleSkillFileSelect(input) {
   reader.readAsText(file);
 }
 
-function clearSkillFile() {
-  document.getElementById('mcp-skill-content').value = '';
-  document.getElementById('mcp-skill-file').value = '';
-  document.getElementById('mcp-skill-filename').textContent = 'No file chosen';
-  document.getElementById('mcp-skill-clear').classList.add('hidden');
+function clearSkillFileUpload() {
+  document.getElementById('skill-content').value = '';
+  document.getElementById('skill-file-input').value = '';
+  document.getElementById('skill-file-label').textContent = 'No file chosen';
+  document.getElementById('skill-file-clear').classList.add('hidden');
 }
 
 async function refreshMCPServer(id) {
@@ -1158,12 +1215,206 @@ document.addEventListener('click', function(e) {
   if (!wrap.contains(e.target)) {
     document.getElementById('tools-dropdown').classList.add('hidden');
   }
+  const skillsWrap = document.getElementById('skills-dropdown-wrap');
+  if (!skillsWrap.contains(e.target)) {
+    document.getElementById('skills-dropdown').classList.add('hidden');
+  }
+});
+
+// ─── Skills ───────────────────────────────────────────────────────────────────
+async function loadSkills() {
+  state.skills = await api('GET', '/skills');
+  renderSkillsList();
+  renderSkillsDropdown();
+}
+
+function renderSkillsList() {
+  const container = document.getElementById('skills-list');
+  if (!state.skills.length) {
+    container.innerHTML = '<div class="text-xs text-gray-600">No skills yet. Click ＋ to add one.</div>';
+    return;
+  }
+  container.innerHTML = state.skills.map(s => `
+    <div class="bg-[#252d3d] rounded-xl p-2.5 text-xs group">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full flex-shrink-0 ${s.enabled ? 'bg-green-400' : 'bg-gray-600'}"></span>
+        <span class="flex-1 font-semibold text-gray-200 truncate">${escapeHtml(s.name)}</span>
+        <button onclick="editSkill('${s.id}')" class="text-gray-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100" title="Edit">✏️</button>
+        <button onclick="deleteSkill('${s.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
+      </div>
+      ${s.description ? `<div class="text-gray-500 truncate mt-0.5">${escapeHtml(s.description)}</div>` : ''}
+      ${s.content ? '<div class="text-blue-400 mt-0.5">📄 Skill loaded</div>' : ''}
+    </div>
+  `).join('');
+}
+
+document.getElementById('btn-add-skill').onclick = () => {
+  document.getElementById('skill-id').value = '';
+  document.getElementById('skill-name').value = '';
+  document.getElementById('skill-desc').value = '';
+  document.getElementById('skill-enabled').checked = true;
+  document.getElementById('skill-content').value = '';
+  document.getElementById('skill-file-input').value = '';
+  document.getElementById('skill-file-label').textContent = 'No file chosen';
+  document.getElementById('skill-file-clear').classList.add('hidden');
+  document.getElementById('modal-skill-title').textContent = 'Add Skill';
+  openModal('skill');
+};
+
+async function editSkill(id) {
+  const s = state.skills.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('skill-id').value = s.id;
+  document.getElementById('skill-name').value = s.name;
+  document.getElementById('skill-desc').value = s.description || '';
+  document.getElementById('skill-enabled').checked = s.enabled;
+  document.getElementById('skill-content').value = s.content || '';
+  document.getElementById('skill-file-input').value = '';
+  if (s.content) {
+    document.getElementById('skill-file-label').textContent = 'skill.md (loaded)';
+    document.getElementById('skill-file-clear').classList.remove('hidden');
+  } else {
+    document.getElementById('skill-file-label').textContent = 'No file chosen';
+    document.getElementById('skill-file-clear').classList.add('hidden');
+  }
+  document.getElementById('modal-skill-title').textContent = 'Edit Skill';
+  openModal('skill');
+}
+
+async function saveSkill(e) {
+  e.preventDefault();
+  const id = document.getElementById('skill-id').value;
+  const payload = {
+    name: document.getElementById('skill-name').value.trim(),
+    description: document.getElementById('skill-desc').value.trim(),
+    enabled: document.getElementById('skill-enabled').checked,
+    content: document.getElementById('skill-content').value,
+  };
+  try {
+    if (id) {
+      await api('PATCH', `/skills/${id}`, payload);
+      toast('Skill updated', 'success');
+    } else {
+      await api('POST', '/skills', payload);
+      toast('Skill added', 'success');
+    }
+    closeModal();
+    await loadSkills();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteSkill(id) {
+  if (!confirm('Delete this skill?')) return;
+  await api('DELETE', `/skills/${id}`);
+  toast('Skill deleted', 'info');
+  await loadSkills();
+}
+
+// ─── Skills Dropdown (per-conversation) ───────────────────────────────────────
+function renderSkillsDropdown() {
+  const itemsEl = document.getElementById('skills-dropdown-items');
+  const emptyEl = document.getElementById('skills-dropdown-empty');
+  const labelEl = document.getElementById('skills-toggle-label');
+
+  const enabledSkills = state.skills.filter(s => s.enabled);
+  if (!enabledSkills.length) {
+    itemsEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    labelEl.textContent = 'Skills';
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  itemsEl.innerHTML = enabledSkills.map(s => {
+    const checked = isSkillSelected(s.id);
+    return `
+      <label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252d3d] transition-colors">
+        <input type="checkbox" class="skill-check w-3.5 h-3.5 rounded accent-accent" data-skill-id="${escapeHtml(s.id)}" ${checked ? 'checked' : ''} />
+        <span class="text-gray-200 truncate">${escapeHtml(s.name)}</span>
+      </label>`;
+  }).join('');
+
+  // Attach change listeners
+  itemsEl.querySelectorAll('.skill-check').forEach(cb => {
+    cb.addEventListener('change', onSkillToggle);
+  });
+
+  updateSkillsLabel();
+}
+
+function isSkillSelected(skillId) {
+  if (state.enabledSkillIds === null) return true; // null = all enabled
+  return state.enabledSkillIds.includes(skillId);
+}
+
+function getSelectedSkillIds() {
+  const enabledSkills = state.skills.filter(s => s.enabled);
+  if (state.enabledSkillIds === null) return enabledSkills.map(s => s.id);
+  return state.enabledSkillIds.filter(id => enabledSkills.some(s => s.id === id));
+}
+
+function updateSkillsLabel() {
+  const labelEl = document.getElementById('skills-toggle-label');
+  const selected = getSelectedSkillIds();
+  const enabledSkills = state.skills.filter(s => s.enabled);
+  if (!enabledSkills.length) {
+    labelEl.textContent = 'Skills';
+  } else if (selected.length === 0) {
+    labelEl.textContent = 'No skills';
+  } else if (selected.length === enabledSkills.length) {
+    labelEl.textContent = `Skills (${selected.length})`;
+  } else {
+    labelEl.textContent = `Skills (${selected.length}/${enabledSkills.length})`;
+  }
+}
+
+function onSkillToggle(e) {
+  const skillId = e.target.dataset.skillId;
+  const enabledSkills = state.skills.filter(s => s.enabled);
+
+  // If currently null (all selected), initialize from all enabled
+  if (state.enabledSkillIds === null) {
+    state.enabledSkillIds = enabledSkills.map(s => s.id);
+  }
+
+  if (e.target.checked) {
+    if (!state.enabledSkillIds.includes(skillId)) {
+      state.enabledSkillIds.push(skillId);
+    }
+  } else {
+    state.enabledSkillIds = state.enabledSkillIds.filter(id => id !== skillId);
+  }
+
+  // If all are selected, set back to null (default)
+  const selectedSet = new Set(state.enabledSkillIds);
+  if (selectedSet.size === enabledSkills.length &&
+      enabledSkills.every(s => selectedSet.has(s.id))) {
+    state.enabledSkillIds = null;
+  }
+
+  updateSkillsLabel();
+
+  // Save to current conversation
+  if (state.currentConvId) {
+    api('PATCH', `/conversations/${state.currentConvId}`, {
+      enabledSkills: state.enabledSkillIds,
+    }).catch(() => {});
+  }
+}
+
+// Toggle skills dropdown visibility
+document.getElementById('skills-toggle-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('skills-dropdown');
+  dropdown.classList.toggle('hidden');
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   initTheme();
-  await Promise.all([loadConversations(), loadLLMProviders(), loadMCPServers()]);
+  await Promise.all([loadConversations(), loadLLMProviders(), loadMCPServers(), loadSkills()]);
 }
 
 init().catch(err => toast(err.message, 'error'));

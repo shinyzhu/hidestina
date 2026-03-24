@@ -10,6 +10,7 @@ const conversationsRouter = require('./routes/conversations');
 const chatRouter = require('./routes/chat');
 const llmRouter = require('./routes/llm');
 const mcpRouter = require('./routes/mcp');
+const skillsRouter = require('./routes/skills');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,6 +52,7 @@ app.use('/api/conversations', apiLimiter, conversationsRouter);
 app.use('/api/chat', chatLimiter, chatRouter);
 app.use('/api/llm', apiLimiter, llmRouter);
 app.use('/api/mcp', apiLimiter, mcpRouter);
+app.use('/api/skills', apiLimiter, skillsRouter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

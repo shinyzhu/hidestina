@@ -31,6 +31,7 @@ function getDefaultStore() {
     conversations: [],
     llmProviders: [],
     mcpServers: [],
+    skills: [],
   };
 }
 
@@ -45,12 +46,13 @@ function saveStore() {
 
 function listConversations() {
   return store.conversations
-    .map(({ id, title, model, providerId, enabledMcpServers, createdAt, updatedAt, messageCount }) => ({
+    .map(({ id, title, model, providerId, enabledMcpServers, enabledSkills, createdAt, updatedAt, messageCount }) => ({
       id,
       title,
       model,
       providerId,
       enabledMcpServers,
+      enabledSkills,
       createdAt,
       updatedAt,
       messageCount,
@@ -62,7 +64,7 @@ function getConversation(id) {
   return store.conversations.find((c) => c.id === id) || null;
 }
 
-function createConversation({ title = 'New Chat', model = '', providerId = '', enabledMcpServers = null } = {}) {
+function createConversation({ title = 'New Chat', model = '', providerId = '', enabledMcpServers = null, enabledSkills = null } = {}) {
   const now = new Date().toISOString();
   const conv = {
     id: uuidv4(),
@@ -70,6 +72,7 @@ function createConversation({ title = 'New Chat', model = '', providerId = '', e
     model,
     providerId,
     enabledMcpServers,
+    enabledSkills,
     messages: [],
     messageCount: 0,
     createdAt: now,
@@ -203,6 +206,51 @@ function deleteMCPServer(id) {
   return true;
 }
 
+// ── Skills ────────────────────────────────────────────────────────────────────
+
+function listSkills() {
+  if (!store.skills) store.skills = [];
+  return store.skills;
+}
+
+function getSkill(id) {
+  if (!store.skills) store.skills = [];
+  return store.skills.find((s) => s.id === id) || null;
+}
+
+function createSkill({ name, content = '', description = '', enabled = true }) {
+  if (!store.skills) store.skills = [];
+  const skill = {
+    id: uuidv4(),
+    name,
+    content,
+    description,
+    enabled,
+    createdAt: new Date().toISOString(),
+  };
+  store.skills.push(skill);
+  saveStore();
+  return skill;
+}
+
+function updateSkill(id, updates) {
+  if (!store.skills) store.skills = [];
+  const skill = store.skills.find((s) => s.id === id);
+  if (!skill) return null;
+  Object.assign(skill, updates);
+  saveStore();
+  return skill;
+}
+
+function deleteSkill(id) {
+  if (!store.skills) store.skills = [];
+  const idx = store.skills.findIndex((s) => s.id === id);
+  if (idx === -1) return false;
+  store.skills.splice(idx, 1);
+  saveStore();
+  return true;
+}
+
 module.exports = {
   listConversations,
   getConversation,
@@ -220,4 +268,9 @@ module.exports = {
   createMCPServer,
   updateMCPServer,
   deleteMCPServer,
+  listSkills,
+  getSkill,
+  createSkill,
+  updateSkill,
+  deleteSkill,
 };

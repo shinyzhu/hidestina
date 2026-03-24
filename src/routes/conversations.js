@@ -12,8 +12,8 @@ router.get('/', (req, res) => {
 
 // POST /api/conversations
 router.post('/', (req, res) => {
-  const { title, model, providerId, enabledMcpServers } = req.body || {};
-  const conv = store.createConversation({ title, model, providerId, enabledMcpServers });
+  const { title, model, providerId, enabledMcpServers, enabledSkills } = req.body || {};
+  const conv = store.createConversation({ title, model, providerId, enabledMcpServers, enabledSkills });
   res.status(201).json(conv);
 });
 

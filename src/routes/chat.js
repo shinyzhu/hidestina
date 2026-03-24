@@ -24,7 +24,7 @@ router.post('/:conversationId', async (req, res) => {
   const conv = store.getConversation(conversationId);
   if (!conv) return res.status(404).json({ error: 'Conversation not found' });
 
-  const { message, providerId, model: reqModel, useTools = true, enabledMcpServers, options = {} } = req.body || {};
+  const { message, providerId, model: reqModel, useTools = true, enabledMcpServers, enabledSkills, options = {} } = req.body || {};
   const model = reqModel || conv.model || '';
   const effectiveProviderId = providerId || conv.providerId || undefined;
   if (!message || !model) {
@@ -41,6 +41,13 @@ router.post('/:conversationId', async (req, res) => {
       (Array.isArray(enabledMcpServers) && Array.isArray(prev) &&
         (enabledMcpServers.length !== prev.length || enabledMcpServers.some((id, i) => id !== prev[i])));
     if (changed) convUpdates.enabledMcpServers = enabledMcpServers;
+  }
+  if (enabledSkills !== undefined) {
+    const prev = conv.enabledSkills;
+    const changed = (enabledSkills === null) !== (prev === null || prev === undefined) ||
+      (Array.isArray(enabledSkills) && Array.isArray(prev) &&
+        (enabledSkills.length !== prev.length || enabledSkills.some((id, i) => id !== prev[i])));
+    if (changed) convUpdates.enabledSkills = enabledSkills;
   }
   if (Object.keys(convUpdates).length > 0) {
     store.updateConversation(conversationId, convUpdates);
@@ -87,20 +94,21 @@ router.post('/:conversationId', async (req, res) => {
       }
     }
 
-    // Inject skill instructions from selected MCP servers as system messages
-    const selectedServerIds = Array.isArray(effectiveMcpServers) ? effectiveMcpServers : null;
-    const enabledServers = store.listMCPServers().filter((s) => {
-      if (!s.enabled || !s.skill) return false;
-      if (selectedServerIds) return selectedServerIds.includes(s.id);
+    // Inject skill instructions from standalone skills collection
+    const effectiveSkills = Array.isArray(enabledSkills) ? enabledSkills : conv.enabledSkills;
+    const selectedSkillIds = Array.isArray(effectiveSkills) ? effectiveSkills : null;
+    const activeSkills = store.listSkills().filter((s) => {
+      if (!s.enabled || !s.content) return false;
+      if (selectedSkillIds) return selectedSkillIds.includes(s.id);
       return true;
     });
-    if (enabledServers.length > 0) {
-      const skillContent = enabledServers
-        .map((s) => `## ${s.name}\n\n${s.skill}`)
+    if (activeSkills.length > 0) {
+      const skillContent = activeSkills
+        .map((s) => `## ${s.name}\n\n${s.content}`)
         .join('\n\n---\n\n');
       messages.unshift({
         role: 'system',
-        content: `The following are skill instructions for the available MCP servers:\n\n${skillContent}`,
+        content: `The following are skill instructions:\n\n${skillContent}`,
       });
     }
 
