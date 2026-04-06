@@ -33,11 +33,20 @@ router.post('/:conversationId', async (req, res) => {
 
   // Validate and sanitise attached files
   const validFiles = [];
+  const rejectedFiles = [];
   if (Array.isArray(files)) {
     for (const f of files) {
-      if (f && typeof f.name === 'string' && typeof f.content === 'string' && f.content.length <= 1024 * 1024) {
-        validFiles.push({ name: f.name.slice(0, 255), content: f.content });
+      if (!f || typeof f.name !== 'string' || typeof f.content !== 'string') {
+        continue;
       }
+      if (f.content.length > 1024 * 1024) {
+        rejectedFiles.push(f.name);
+        continue;
+      }
+      validFiles.push({ name: f.name.slice(0, 255), content: f.content });
+    }
+    if (rejectedFiles.length > 0) {
+      console.warn(`Rejected files exceeding size limit: ${rejectedFiles.join(', ')}`);
     }
   }
 

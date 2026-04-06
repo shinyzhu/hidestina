@@ -236,7 +236,7 @@
       <!-- Attached files preview -->
       <div id="attached-files" class="hidden flex flex-wrap gap-1.5 mb-1.5 px-1"></div>
       <div class="flex gap-2 items-end bg-[#1e2536] border border-[#30363d] rounded-2xl px-4 py-2 focus-within:border-accent transition-colors shadow-lg">
-        <input type="file" id="file-attach-input" multiple accept=".txt,.md,.csv,.json,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.js,.ts,.jsx,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.cs,.php,.sh,.bash,.zsh,.sql,.html,.css,.scss,.less,.vue,.svelte,.swift,.kt,.r,.m,.pl,.lua,.zig,.ex,.exs,.erl,.hs,.clj,.scala,.dart,.tf,.dockerfile,.makefile,.cmake,.gradle,.env,.gitignore,.editorconfig,.prettierrc" class="hidden" />
+        <input type="file" id="file-attach-input" multiple class="hidden" />
         <button id="btn-attach" type="button" class="flex-shrink-0 p-1.5 rounded-xl text-gray-500 hover:text-white transition-colors" title="Attach files">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
         </button>
@@ -775,6 +775,8 @@ btnSend.onclick = sendMessage;
 // ─── File Attachments ─────────────────────────────────────────────────────────
 const MAX_FILE_SIZE = 1024 * 1024; // 1 MB per file
 const MAX_FILES = 10;
+const TEXT_FILE_EXTENSIONS = '.txt,.md,.csv,.json,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.log,.js,.ts,.jsx,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.cs,.php,.sh,.bash,.zsh,.sql,.html,.css,.scss,.less,.vue,.svelte,.swift,.kt,.r,.m,.pl,.lua,.zig,.ex,.exs,.erl,.hs,.clj,.scala,.dart,.tf,.dockerfile,.makefile,.cmake,.gradle,.env,.gitignore,.editorconfig,.prettierrc';
+fileAttachInput.setAttribute('accept', TEXT_FILE_EXTENSIONS);
 
 btnAttach.onclick = () => fileAttachInput.click();
 
