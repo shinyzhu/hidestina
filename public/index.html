@@ -270,9 +270,9 @@
         </div>
       </div>
       <!-- Context length indicator -->
-      <div id="context-indicator" class="hidden flex items-center gap-1.5 text-xs text-gray-500 ml-auto" title="Estimated context usage">
-        <span id="context-indicator-label">0 / 0</span>
-        <div class="w-16 h-1.5 bg-[#252d3d] rounded-full overflow-hidden">
+      <div id="context-indicator" class="hidden flex items-center gap-1.5 text-xs text-gray-500 ml-auto" title="Estimated context usage" role="status" aria-live="polite">
+        <span id="context-indicator-label" aria-label="Estimated token usage">0 / 0</span>
+        <div class="w-16 h-1.5 bg-[#252d3d] rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="context-indicator-bar" class="h-full rounded-full transition-all duration-300" style="width: 0%; background: #7c6aff;"></div>
         </div>
       </div>
@@ -882,7 +882,7 @@ async function sendMessage() {
             const fullConv = await api('GET', `/conversations/${state.currentConvId}`);
             state.currentMessages = fullConv.messages || [];
             updateContextIndicator(state.currentMessages);
-          } catch {}
+          } catch { /* Context indicator is non-critical; ignore fetch failures */ }
         } else if (data.type === 'error') {
           throw new Error(data.error);
         }
@@ -939,7 +939,7 @@ function estimateTokenCount(messages) {
     if (m.toolCallId) totalChars += m.toolCallId.length;
     if (m.name) totalChars += m.name.length;
   }
-  // Rough estimate: ~4 characters per token for English text
+  // Rough estimate: ~4 characters per token (approximate for English; varies by language and content)
   return Math.ceil(totalChars / 4);
 }
 
@@ -970,8 +970,9 @@ function updateContextIndicator(messages) {
 
   label.textContent = `~${formatTokenCount(tokenEstimate)} / ${formatTokenCount(contextLength)}`;
   bar.style.width = pct + '%';
+  bar.parentElement.setAttribute('aria-valuenow', Math.round(pct));
 
-  // Color: green (<50%), yellow (50-80%), red (>80%)
+  // Color: purple (<50%), yellow (50-80%), red (>80%)
   if (pct > 80) {
     bar.style.background = '#ef4444';
   } else if (pct > 50) {
