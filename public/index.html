@@ -269,6 +269,13 @@
           <div id="skills-dropdown-empty" class="px-3 py-2 text-xs text-gray-600">No skills configured</div>
         </div>
       </div>
+      <!-- Context length indicator -->
+      <div id="context-indicator" class="hidden flex items-center gap-1.5 text-xs text-gray-500 ml-auto" title="Estimated context usage" role="status" aria-live="polite">
+        <span id="context-indicator-label" aria-label="Estimated token usage">0 / 0</span>
+        <div class="w-16 h-1.5 bg-[#252d3d] rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="context-indicator-bar" class="h-full rounded-full transition-all duration-300" style="width: 0%; background: #7c6aff;"></div>
+        </div>
+      </div>
     </div>
     <p class="text-center text-xs text-gray-600 mt-1.5">HiDestina may make mistakes. Verify important info.</p>
   </div>
@@ -305,6 +312,11 @@
       <div>
         <label class="block text-xs font-semibold text-gray-400 mb-1">Model *</label>
         <input id="llm-model" type="text" required placeholder="e.g. gpt-4o, deepseek-chat, llama3…"
+          class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 mb-1">Context Length</label>
+        <input id="llm-context-length" type="number" min="0" step="1" placeholder="e.g. 128000 (tokens, 0 = unknown)"
           class="w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors" />
       </div>
       <div>
@@ -411,6 +423,7 @@
 let state = {
   conversations: [],
   currentConvId: null,
+  currentMessages: [],
   llmProviders: [],
   mcpServers: [],
   skills: [],
@@ -527,6 +540,7 @@ function renderConversationList() {
 async function selectConversation(id) {
   state.currentConvId = id;
   const conv = await api('GET', `/conversations/${id}`);
+  state.currentMessages = conv.messages || [];
   renderConversationList();
   renderMessages(conv.messages);
   document.getElementById('conv-title').textContent = conv.title || 'New Chat';
@@ -542,6 +556,9 @@ async function selectConversation(id) {
 
   // Restore skill selections for this conversation
   restoreSkillSelection(conv);
+
+  // Update context indicator
+  updateContextIndicator(state.currentMessages);
 
   scrollToBottom();
 }
@@ -608,11 +625,13 @@ async function deleteConversation(id) {
   state.conversations = state.conversations.filter(c => c.id !== id);
   if (state.currentConvId === id) {
     state.currentConvId = null;
+    state.currentMessages = [];
     document.getElementById('messages-container').innerHTML = '';
     document.getElementById('empty-state').style.display = '';
     document.getElementById('conv-title').textContent = 'Select or start a chat';
     document.getElementById('conv-model').textContent = 'No model selected';
     document.getElementById('btn-delete-conv').classList.add('hidden');
+    updateContextIndicator([]);
   }
   renderConversationList();
   toast('Conversation deleted', 'info');
@@ -758,6 +777,8 @@ async function sendMessage() {
 
   // Append user message
   appendMessage({ role: 'user', content: text });
+  state.currentMessages.push({ role: 'user', content: text });
+  updateContextIndicator(state.currentMessages);
   scrollToBottom();
 
   // Show typing indicator
@@ -856,6 +877,12 @@ async function sendMessage() {
           const conv = state.conversations.find(c => c.id === state.currentConvId);
           document.getElementById('conv-title').textContent = conv?.title || 'Chat';
           document.getElementById('conv-model').textContent = conv?.model ? `Model: ${conv.model}` : 'No model selected';
+          // Refresh messages for context indicator
+          try {
+            const fullConv = await api('GET', `/conversations/${state.currentConvId}`);
+            state.currentMessages = fullConv.messages || [];
+            updateContextIndicator(state.currentMessages);
+          } catch { /* Context indicator is non-critical; ignore fetch failures */ }
         } else if (data.type === 'error') {
           throw new Error(data.error);
         }
@@ -886,6 +913,7 @@ function populateModelDropdown() {
     sel.innerHTML = '<option value="">No LLMs added yet</option>';
     document.getElementById('conv-model').textContent = 'No model selected';
     state.selectedProviderId = null;
+    updateContextIndicator();
     return;
   }
   sel.innerHTML = state.llmProviders.map((p, i) =>
@@ -895,6 +923,65 @@ function populateModelDropdown() {
   const first = state.llmProviders[0];
   state.selectedProviderId = first.id;
   document.getElementById('conv-model').textContent = `Model: ${first.model}`;
+  updateContextIndicator();
+}
+
+// ─── Context Length Indicator ─────────────────────────────────────────────────
+
+function estimateTokenCount(messages) {
+  if (!messages || messages.length === 0) return 0;
+  let totalChars = 0;
+  for (const m of messages) {
+    // Each message has ~4 tokens of overhead (role, delimiters)
+    totalChars += 16; // ~4 tokens overhead × 4 chars/token
+    if (typeof m.content === 'string') totalChars += m.content.length;
+    if (m.toolCalls) totalChars += JSON.stringify(m.toolCalls).length;
+    if (m.toolCallId) totalChars += m.toolCallId.length;
+    if (m.name) totalChars += m.name.length;
+  }
+  // Rough estimate: ~4 characters per token (approximate for English; varies by language and content)
+  return Math.ceil(totalChars / 4);
+}
+
+function formatTokenCount(count) {
+  if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+  if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
+  return String(count);
+}
+
+function getSelectedProviderContextLength() {
+  const provider = state.llmProviders.find(p => p.id === state.selectedProviderId);
+  return provider?.contextLength || 0;
+}
+
+function updateContextIndicator(messages) {
+  const indicator = document.getElementById('context-indicator');
+  const label = document.getElementById('context-indicator-label');
+  const bar = document.getElementById('context-indicator-bar');
+  const contextLength = getSelectedProviderContextLength();
+
+  if (!contextLength) {
+    indicator.classList.add('hidden');
+    return;
+  }
+
+  const tokenEstimate = estimateTokenCount(messages || []);
+  const pct = Math.min((tokenEstimate / contextLength) * 100, 100);
+
+  label.textContent = `~${formatTokenCount(tokenEstimate)} / ${formatTokenCount(contextLength)}`;
+  bar.style.width = pct + '%';
+  bar.parentElement.setAttribute('aria-valuenow', Math.round(pct));
+
+  // Color: purple (<50%), yellow (50-80%), red (>80%)
+  if (pct > 80) {
+    bar.style.background = '#ef4444';
+  } else if (pct > 50) {
+    bar.style.background = '#eab308';
+  } else {
+    bar.style.background = '#7c6aff';
+  }
+
+  indicator.classList.remove('hidden');
 }
 
 function renderLLMList() {
@@ -921,6 +1008,9 @@ document.getElementById('model-input').addEventListener('change', function() {
   state.selectedProviderId = providerId || null;
   document.getElementById('conv-model').textContent = this.value ? `Model: ${this.value}` : 'No model selected';
 
+  // Update context indicator for new provider
+  updateContextIndicator(state.currentMessages || []);
+
   // Save model selection to current conversation
   if (state.currentConvId && this.value) {
     api('PATCH', `/conversations/${state.currentConvId}`, {
@@ -936,6 +1026,7 @@ document.getElementById('btn-add-llm').onclick = () => {
   document.getElementById('llm-baseurl').value = '';
   document.getElementById('llm-apikey').value = '';
   document.getElementById('llm-model').value = '';
+  document.getElementById('llm-context-length').value = '';
   document.getElementById('llm-desc').value = '';
   document.getElementById('modal-llm-title').textContent = 'Add LLM Provider';
   openModal('llm');
@@ -949,6 +1040,7 @@ async function editLLMProvider(id) {
   document.getElementById('llm-baseurl').value = p.baseURL;
   document.getElementById('llm-apikey').value = '';  // Don't expose masked key
   document.getElementById('llm-model').value = p.model || '';
+  document.getElementById('llm-context-length').value = p.contextLength || '';
   document.getElementById('llm-desc').value = p.description || '';
   document.getElementById('modal-llm-title').textContent = 'Edit LLM Provider';
   openModal('llm');
@@ -962,6 +1054,7 @@ async function saveLLMProvider(e) {
     baseURL: document.getElementById('llm-baseurl').value.trim(),
     apiKey: document.getElementById('llm-apikey').value.trim() || undefined,
     model: document.getElementById('llm-model').value.trim(),
+    contextLength: parseInt(document.getElementById('llm-context-length').value, 10) || 0,
     description: document.getElementById('llm-desc').value.trim(),
   };
   try {

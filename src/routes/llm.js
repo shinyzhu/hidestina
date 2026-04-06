@@ -18,11 +18,11 @@ router.get('/', (req, res) => {
 
 // POST /api/llm
 router.post('/', (req, res) => {
-  const { name, baseURL, apiKey, model, description } = req.body || {};
+  const { name, baseURL, apiKey, model, description, contextLength } = req.body || {};
   if (!name || !baseURL || !model) {
     return res.status(400).json({ error: 'name, baseURL, and model are required' });
   }
-  const provider = store.createLLMProvider({ name, baseURL, apiKey, model, description });
+  const provider = store.createLLMProvider({ name, baseURL, apiKey, model, description, contextLength: parseInt(contextLength, 10) || 0 });
   res.status(201).json({ ...provider, apiKey: provider.apiKey ? '***' : '' });
 });
 
@@ -51,7 +51,11 @@ router.get('/:id/models', async (req, res) => {
 
 // PATCH /api/llm/:id
 router.patch('/:id', (req, res) => {
-  const updated = store.updateLLMProvider(req.params.id, req.body);
+  const body = { ...req.body };
+  if (body.contextLength !== undefined) {
+    body.contextLength = parseInt(body.contextLength, 10) || 0;
+  }
+  const updated = store.updateLLMProvider(req.params.id, body);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json({ ...updated, apiKey: updated.apiKey ? '***' : '' });
 });

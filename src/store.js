@@ -132,7 +132,7 @@ function getLLMProvider(id) {
   return store.llmProviders.find((p) => p.id === id) || null;
 }
 
-function createLLMProvider({ name, baseURL, apiKey = '', model = '', description = '' }) {
+function createLLMProvider({ name, baseURL, apiKey = '', model = '', description = '', contextLength = 0 }) {
   const provider = {
     id: uuidv4(),
     name,
@@ -140,6 +140,7 @@ function createLLMProvider({ name, baseURL, apiKey = '', model = '', description
     apiKey,
     model,
     description,
+    contextLength,
     createdAt: new Date().toISOString(),
   };
   store.llmProviders.push(provider);
