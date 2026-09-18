@@ -8,6 +8,43 @@ const store = require('../store');
 // Cache of connected MCP clients by server id
 const clientCache = new Map();
 
+function buildMcpUrlCandidates(rawUrl) {
+  const candidates = new Set();
+
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return [];
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return [];
+
+  try {
+    const url = new URL(trimmed);
+    candidates.add(url.toString());
+
+    const normalizedBase = url.origin + (url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, ''));
+    const fallbackBase = normalizedBase.replace(/\/(sse|mcp|messages)$/i, '');
+
+    for (const candidatePath of ['', '/sse', '/mcp', '/messages']) {
+      const candidate = new URL(`${fallbackBase}${candidatePath}`);
+      candidate.search = url.search;
+      candidate.hash = url.hash;
+      candidates.add(candidate.toString());
+    }
+
+    // Also try the host root if the user entered a base URL instead of a transport endpoint.
+    const hostRoot = new URL(url.origin);
+    hostRoot.search = url.search;
+    hostRoot.hash = url.hash;
+    candidates.add(hostRoot.toString());
+  } catch {
+    // Keep the original raw value so callers can see the exact input that failed.
+    candidates.add(trimmed);
+  }
+
+  return [...candidates];
+}
+
 async function getOrConnectClient(serverId) {
   if (clientCache.has(serverId)) {
     return clientCache.get(serverId);
@@ -29,26 +66,34 @@ async function getOrConnectClient(serverId) {
     transportOpts.eventSourceInit = { headers };
   }
 
-  // Try Streamable HTTP first, fall back to SSE
-  let transport;
-  try {
-    transport = new StreamableHTTPClientTransport(new URL(server.url), transportOpts);
-    await client.connect(transport);
-  } catch {
-    try {
-      transport = new SSEClientTransport(new URL(server.url), transportOpts);
-      await client.connect(transport);
-    } catch (err) {
-      throw new Error(`Cannot connect to MCP server "${server.name}": ${err.message}`);
+  const urlCandidates = buildMcpUrlCandidates(server.url);
+  const failures = [];
+
+  for (const transportType of ['streamable', 'sse']) {
+    for (const candidateUrl of urlCandidates) {
+      try {
+        const url = new URL(candidateUrl);
+        if (transportType === 'streamable') {
+          const transport = new StreamableHTTPClientTransport(url, transportOpts);
+          await client.connect(transport);
+          clientCache.set(serverId, client);
+          client.onclose = () => clientCache.delete(serverId);
+          return client;
+        }
+
+        const transport = new SSEClientTransport(url, transportOpts);
+        await client.connect(transport);
+        clientCache.set(serverId, client);
+        client.onclose = () => clientCache.delete(serverId);
+        return client;
+      } catch (err) {
+        failures.push(`${transportType}:${candidateUrl} -> ${err && err.message ? err.message : String(err)}`);
+      }
     }
   }
 
-  clientCache.set(serverId, client);
-
-  // Remove client from cache if connection drops
-  client.onclose = () => clientCache.delete(serverId);
-
-  return client;
+  const details = failures.length ? failures.slice(0, 5).join('; ') : 'No transport attempts were made';
+  throw new Error(`Cannot connect to MCP server "${server.name}". Tried: ${details}`);
 }
 
 function disconnectClient(serverId) {

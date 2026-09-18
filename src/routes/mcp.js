@@ -17,6 +17,18 @@ router.post('/', (req, res) => {
   if (!name || !url) {
     return res.status(400).json({ error: 'name and url are required' });
   }
+
+  try {
+    // Validate the configured transport URL. Common server endpoints are HTTP(S) URLs to
+    // a streamable endpoint or an SSE endpoint such as /mcp or /sse.
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Only http:// and https:// URLs are supported for MCP servers');
+    }
+  } catch (err) {
+    return res.status(400).json({ error: `Invalid MCP server URL: ${err.message}` });
+  }
+
   const server = store.createMCPServer({ name, url, description, enabled, authToken, skill });
   res.status(201).json(server);
 });
