@@ -2,7 +2,6 @@
 
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { SSEClientTransport } = require('@modelcontextprotocol/sdk/client/sse.js');
 const store = require('../store');
 
 // Cache of connected MCP clients by server id
@@ -25,7 +24,7 @@ function buildMcpUrlCandidates(rawUrl) {
     const normalizedBase = url.origin + (url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, ''));
     const fallbackBase = normalizedBase.replace(/\/(sse|mcp|messages)$/i, '');
 
-    for (const candidatePath of ['', '/sse', '/mcp', '/messages']) {
+    for (const candidatePath of ['', '/mcp', '/messages']) {
       const candidate = new URL(`${fallbackBase}${candidatePath}`);
       candidate.search = url.search;
       candidate.hash = url.hash;
@@ -61,34 +60,24 @@ async function getOrConnectClient(serverId) {
   if (server.authToken) {
     // Sanitize token to prevent header injection (strip CR/LF characters)
     const safeToken = server.authToken.replace(/[\r\n]/g, '');
-    const headers = { Authorization: `Bearer ${safeToken}` };
-    transportOpts.requestInit = { headers };
-    transportOpts.eventSourceInit = { headers };
+    transportOpts.requestInit = {
+      headers: { Authorization: `Bearer ${safeToken}` },
+    };
   }
 
   const urlCandidates = buildMcpUrlCandidates(server.url);
   const failures = [];
 
-  for (const transportType of ['streamable', 'sse']) {
-    for (const candidateUrl of urlCandidates) {
-      try {
-        const url = new URL(candidateUrl);
-        if (transportType === 'streamable') {
-          const transport = new StreamableHTTPClientTransport(url, transportOpts);
-          await client.connect(transport);
-          clientCache.set(serverId, client);
-          client.onclose = () => clientCache.delete(serverId);
-          return client;
-        }
-
-        const transport = new SSEClientTransport(url, transportOpts);
-        await client.connect(transport);
-        clientCache.set(serverId, client);
-        client.onclose = () => clientCache.delete(serverId);
-        return client;
-      } catch (err) {
-        failures.push(`${transportType}:${candidateUrl} -> ${err && err.message ? err.message : String(err)}`);
-      }
+  for (const candidateUrl of urlCandidates) {
+    try {
+      const url = new URL(candidateUrl);
+      const transport = new StreamableHTTPClientTransport(url, transportOpts);
+      await client.connect(transport);
+      clientCache.set(serverId, client);
+      client.onclose = () => clientCache.delete(serverId);
+      return client;
+    } catch (err) {
+      failures.push(`streamable:${candidateUrl} -> ${err && err.message ? err.message : String(err)}`);
     }
   }
 

@@ -20,7 +20,7 @@ router.post('/', (req, res) => {
 
   try {
     // Validate the configured transport URL. Common server endpoints are HTTP(S) URLs to
-    // a streamable endpoint or an SSE endpoint such as /mcp or /sse.
+    // a streamable transport endpoint such as /mcp.
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       throw new Error('Only http:// and https:// URLs are supported for MCP servers');
