@@ -165,19 +165,22 @@ async function getAllEnabledTools(serverIds) {
   const toolToServer = {};
   const usedToolNames = new Set();
 
-  const toolResults = await Promise.allSettled(
-    servers.map(async (server) => ({
-      server,
-      tools: await Promise.resolve().then(() => listTools(server.id)),
-    }))
+  const toolResults = await Promise.all(
+    servers.map(async (server) => {
+      try {
+        return { server, tools: await listTools(server.id) };
+      } catch {
+        return null;
+      }
+    })
   );
 
   for (const [serverIndex, result] of toolResults.entries()) {
-    if (result.status !== 'fulfilled') {
+    if (!result) {
       continue;
     }
 
-    const { server, tools } = result.value;
+    const { server, tools } = result;
     for (const [toolIndex, tool] of tools.entries()) {
       const qualifiedName = buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedToolNames);
       toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
