@@ -31,10 +31,11 @@ function uniquifyToolName(baseName, usedNames) {
   return candidate;
 }
 
-function buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedNames) {
-  const serverSegment = sanitizeToolNameSegment(server.name || server.id, `server_${serverIndex + 1}`);
+function buildQualifiedToolName(server, tool, toolIndex, usedNames) {
+  const serverSegment = sanitizeToolNameSegment(server.name, 'server');
+  const serverIdSegment = sanitizeToolNameSegment(server.id, 'server').replace(/_/g, '').slice(0, 8) || 'server';
   const toolSegment = sanitizeToolNameSegment(tool.name, `tool_${toolIndex + 1}`);
-  const baseName = `mcp_${serverIndex + 1}_${serverSegment}_${toolSegment}`;
+  const baseName = `mcp_${serverSegment}_${serverIdSegment}_${toolSegment}`;
   return uniquifyToolName(baseName, usedNames);
 }
 
@@ -175,14 +176,14 @@ async function getAllEnabledTools(serverIds) {
     })
   );
 
-  for (const [serverIndex, result] of toolResults.entries()) {
+  for (const result of toolResults) {
     if (!result) {
       continue;
     }
 
     const { server, tools } = result;
     for (const [toolIndex, tool] of tools.entries()) {
-      const qualifiedName = buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedToolNames);
+      const qualifiedName = buildQualifiedToolName(server, tool, toolIndex, usedToolNames);
       toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
       openaiTools.push({
         type: 'function',
