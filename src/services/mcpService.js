@@ -31,11 +31,18 @@ function uniquifyToolName(baseName, usedNames) {
   return candidate;
 }
 
-function buildQualifiedToolName(server, tool, toolIndex, usedNames) {
+function buildServerAliasSegment(server) {
   const serverSegment = sanitizeToolNameSegment(server.name, 'server');
-  const serverIdSegment = sanitizeToolNameSegment(server.id, 'server').replace(/_/g, '').slice(0, 8) || 'server';
+  const serverIdSegment = String(server.id || '')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .slice(0, 8) || 'server';
+
+  return `${serverSegment}_${serverIdSegment}`;
+}
+
+function buildQualifiedToolName(server, tool, toolIndex, usedNames) {
   const toolSegment = sanitizeToolNameSegment(tool.name, `tool_${toolIndex + 1}`);
-  const baseName = `mcp_${serverSegment}_${serverIdSegment}_${toolSegment}`;
+  const baseName = `mcp_${buildServerAliasSegment(server)}_${toolSegment}`;
   return uniquifyToolName(baseName, usedNames);
 }
 
@@ -166,22 +173,16 @@ async function getAllEnabledTools(serverIds) {
   const toolToServer = {};
   const usedToolNames = new Set();
 
-  const toolResults = await Promise.all(
-    servers.map(async (server) => {
-      try {
-        return { server, tools: await listTools(server.id) };
-      } catch {
-        return null;
-      }
-    })
+  const toolResults = await Promise.allSettled(
+    servers.map(async (server) => ({ server, tools: await listTools(server.id) }))
   );
 
   for (const result of toolResults) {
-    if (!result) {
+    if (result.status !== 'fulfilled') {
       continue;
     }
 
-    const { server, tools } = result;
+    const { server, tools } = result.value;
     for (const [toolIndex, tool] of tools.entries()) {
       const qualifiedName = buildQualifiedToolName(server, tool, toolIndex, usedToolNames);
       toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
