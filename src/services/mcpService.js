@@ -148,7 +148,7 @@ async function callTool(serverId, toolName, args) {
 }
 
 /**
- * Gather all tools from enabled MCP servers, formatted for the OpenAI tool format.
+ * Gather all tools from enabled MCP servers, formatted for chat-completions tool calling.
  * If serverIds is provided (array), only those servers are used; otherwise all enabled servers.
  * Returns { openaiTools, toolToServer } where toolToServer maps tool name -> server id.
  */
@@ -192,7 +192,7 @@ async function getAllEnabledTools(serverIds) {
 
 /**
  * Execute a tool call returned by the LLM.
- * The tool name is in format `serverId__toolName`.
+ * The tool name is a provider-safe alias generated for the current request.
  */
 async function executeToolCall(qualifiedName, argsJson, toolToServer) {
   const mapping = toolToServer[qualifiedName];
