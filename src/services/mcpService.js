@@ -6,6 +6,37 @@ const store = require('../store');
 
 // Cache of connected MCP clients by server id
 const clientCache = new Map();
+const MAX_TOOL_NAME_LENGTH = 64;
+
+function sanitizeToolNameSegment(value, fallback) {
+  const sanitized = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return sanitized || fallback;
+}
+
+function uniquifyToolName(baseName, usedNames) {
+  let candidate = baseName.slice(0, MAX_TOOL_NAME_LENGTH);
+  let suffix = 1;
+
+  while (usedNames.has(candidate)) {
+    const dedupeSuffix = `_${suffix++}`;
+    candidate = `${baseName.slice(0, MAX_TOOL_NAME_LENGTH - dedupeSuffix.length)}${dedupeSuffix}`;
+  }
+
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedNames) {
+  const serverSegment = sanitizeToolNameSegment(server.name || server.id, `server_${serverIndex + 1}`);
+  const toolSegment = sanitizeToolNameSegment(tool.name, `tool_${toolIndex + 1}`);
+  const baseName = `mcp_${serverIndex + 1}_${serverSegment}_${toolSegment}`;
+  return uniquifyToolName(baseName, usedNames);
+}
 
 function buildMcpUrlCandidates(rawUrl) {
   const candidates = new Set();
@@ -132,13 +163,14 @@ async function getAllEnabledTools(serverIds) {
   }
   const openaiTools = [];
   const toolToServer = {};
+  const usedToolNames = new Set();
 
   await Promise.allSettled(
-    servers.map(async (server) => {
+    servers.map(async (server, serverIndex) => {
       try {
         const tools = await listTools(server.id);
-        for (const tool of tools) {
-          const qualifiedName = `${server.id}__${tool.name}`;
+        for (const [toolIndex, tool] of tools.entries()) {
+          const qualifiedName = buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedToolNames);
           toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
           openaiTools.push({
             type: 'function',
