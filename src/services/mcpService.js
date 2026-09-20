@@ -150,7 +150,7 @@ async function callTool(serverId, toolName, args) {
 /**
  * Gather all tools from enabled MCP servers, formatted for chat-completions tool calling.
  * If serverIds is provided (array), only those servers are used; otherwise all enabled servers.
- * Returns { openaiTools, toolToServer } where toolToServer maps tool name -> server id.
+ * Returns { openaiTools, toolToServer } where toolToServer maps tool name -> { serverId, toolName }.
  */
 async function getAllEnabledTools(serverIds) {
   let servers;
@@ -166,7 +166,10 @@ async function getAllEnabledTools(serverIds) {
   const usedToolNames = new Set();
 
   const toolResults = await Promise.allSettled(
-    servers.map(async (server) => ({ server, tools: await listTools(server.id) }))
+    servers.map(async (server) => ({
+      server,
+      tools: await Promise.resolve().then(() => listTools(server.id)),
+    }))
   );
 
   for (const [serverIndex, result] of toolResults.entries()) {
