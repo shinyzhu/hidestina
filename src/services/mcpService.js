@@ -6,6 +6,45 @@ const store = require('../store');
 
 // Cache of connected MCP clients by server id
 const clientCache = new Map();
+const MAX_TOOL_NAME_LENGTH = 64;
+
+function sanitizeToolNameSegment(value, fallback) {
+  const sanitized = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return sanitized || fallback;
+}
+
+function uniquifyToolName(baseName, usedNames) {
+  let candidate = baseName.slice(0, MAX_TOOL_NAME_LENGTH);
+  let suffix = 1;
+
+  while (usedNames.has(candidate)) {
+    const dedupeSuffix = `_${suffix++}`;
+    candidate = `${baseName.slice(0, MAX_TOOL_NAME_LENGTH - dedupeSuffix.length)}${dedupeSuffix}`;
+  }
+
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function buildServerAliasSegment(server) {
+  const serverSegment = sanitizeToolNameSegment(server.name, 'server');
+  const serverIdSegment = String(server.id || '')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .slice(0, 8) || 'server';
+
+  return `${serverSegment}_${serverIdSegment}`;
+}
+
+function buildQualifiedToolName(server, tool, toolIndex, usedNames) {
+  const toolSegment = sanitizeToolNameSegment(tool.name, `tool_${toolIndex + 1}`);
+  const baseName = `mcp_${buildServerAliasSegment(server)}_${toolSegment}`;
+  return uniquifyToolName(baseName, usedNames);
+}
 
 function buildMcpUrlCandidates(rawUrl) {
   const candidates = new Set();
@@ -117,9 +156,9 @@ async function callTool(serverId, toolName, args) {
 }
 
 /**
- * Gather all tools from enabled MCP servers, formatted for the OpenAI tool format.
+ * Gather all tools from enabled MCP servers, formatted for chat-completions tool calling.
  * If serverIds is provided (array), only those servers are used; otherwise all enabled servers.
- * Returns { openaiTools, toolToServer } where toolToServer maps tool name -> server id.
+ * Returns { openaiTools, toolToServer } where toolToServer maps tool name -> { serverId, toolName }.
  */
 async function getAllEnabledTools(serverIds) {
   let servers;
@@ -132,35 +171,38 @@ async function getAllEnabledTools(serverIds) {
   }
   const openaiTools = [];
   const toolToServer = {};
+  const usedToolNames = new Set();
 
-  await Promise.allSettled(
-    servers.map(async (server) => {
-      try {
-        const tools = await listTools(server.id);
-        for (const tool of tools) {
-          const qualifiedName = `${server.id}__${tool.name}`;
-          toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
-          openaiTools.push({
-            type: 'function',
-            function: {
-              name: qualifiedName,
-              description: tool.description || '',
-              parameters: tool.inputSchema || { type: 'object', properties: {} },
-            },
-          });
-        }
-      } catch {
-        // Skip unreachable servers
-      }
-    })
+  const toolResults = await Promise.allSettled(
+    servers.map(async (server) => ({ server, tools: await listTools(server.id) }))
   );
+
+  for (const result of toolResults) {
+    if (result.status !== 'fulfilled') {
+      continue;
+    }
+
+    const { server, tools } = result.value;
+    for (const [toolIndex, tool] of tools.entries()) {
+      const qualifiedName = buildQualifiedToolName(server, tool, toolIndex, usedToolNames);
+      toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
+      openaiTools.push({
+        type: 'function',
+        function: {
+          name: qualifiedName,
+          description: tool.description || '',
+          parameters: tool.inputSchema || { type: 'object', properties: {} },
+        },
+      });
+    }
+  }
 
   return { openaiTools, toolToServer };
 }
 
 /**
  * Execute a tool call returned by the LLM.
- * The tool name is in format `serverId__toolName`.
+ * The tool name is a provider-safe alias generated for the current request.
  */
 async function executeToolCall(qualifiedName, argsJson, toolToServer) {
   const mapping = toolToServer[qualifiedName];
