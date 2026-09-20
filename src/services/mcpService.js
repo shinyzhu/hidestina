@@ -165,27 +165,29 @@ async function getAllEnabledTools(serverIds) {
   const toolToServer = {};
   const usedToolNames = new Set();
 
-  await Promise.allSettled(
-    servers.map(async (server, serverIndex) => {
-      try {
-        const tools = await listTools(server.id);
-        for (const [toolIndex, tool] of tools.entries()) {
-          const qualifiedName = buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedToolNames);
-          toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
-          openaiTools.push({
-            type: 'function',
-            function: {
-              name: qualifiedName,
-              description: tool.description || '',
-              parameters: tool.inputSchema || { type: 'object', properties: {} },
-            },
-          });
-        }
-      } catch {
-        // Skip unreachable servers
-      }
-    })
+  const toolResults = await Promise.allSettled(
+    servers.map(async (server) => ({ server, tools: await listTools(server.id) }))
   );
+
+  for (const [serverIndex, result] of toolResults.entries()) {
+    if (result.status !== 'fulfilled') {
+      continue;
+    }
+
+    const { server, tools } = result.value;
+    for (const [toolIndex, tool] of tools.entries()) {
+      const qualifiedName = buildQualifiedToolName(server, tool, serverIndex, toolIndex, usedToolNames);
+      toolToServer[qualifiedName] = { serverId: server.id, toolName: tool.name };
+      openaiTools.push({
+        type: 'function',
+        function: {
+          name: qualifiedName,
+          description: tool.description || '',
+          parameters: tool.inputSchema || { type: 'object', properties: {} },
+        },
+      });
+    }
+  }
 
   return { openaiTools, toolToServer };
 }
