@@ -380,19 +380,37 @@
         <input type="checkbox" id="mcp-enabled" checked class="w-4 h-4 rounded accent-accent" />
         <label for="mcp-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
       </div>
-      <div id="mcp-tools-section" class="hidden">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold text-gray-400">Available Tools</span>
-          <button type="button" onclick="hideMCPTools()" class="text-xs text-gray-500 hover:text-gray-300">▲ Hide</button>
-        </div>
-        <div id="mcp-tools-list" class="bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 space-y-1 max-h-40 overflow-y-auto"></div>
-      </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
-        <button type="button" id="btn-list-tools" onclick="showMCPTools()" class="hidden flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">List Tools</button>
         <button type="button" onclick="closeModal()" class="flex-1 bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 rounded-xl transition-colors text-sm">Cancel</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- MCP Tools Modal -->
+<div id="modal-mcp-tools" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto animate-slide-up">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
+      <h3 id="modal-mcp-tools-title" class="font-semibold text-white text-lg">Tools</h3>
+      <button onclick="closeMCPToolsModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
+    </div>
+    <div class="px-6 py-4">
+      <div id="mcp-tools-table-wrap" class="overflow-y-auto max-h-80">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-[#30363d]">
+              <th class="text-left pb-2 pr-4 w-1/3">Name</th>
+              <th class="text-left pb-2">Description</th>
+            </tr>
+          </thead>
+          <tbody id="mcp-tools-table-body"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-end pt-4">
+        <button type="button" onclick="closeMCPToolsModal()" class="bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 px-5 rounded-xl transition-colors text-sm">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1210,6 +1228,7 @@ function renderMCPList() {
         <span class="w-2 h-2 rounded-full flex-shrink-0 ${s.enabled ? 'bg-green-400' : 'bg-gray-600'}"></span>
         <span class="flex-1 font-semibold text-gray-200 truncate">${escapeHtml(s.name)}</span>
         <button onclick="refreshMCPServer('${s.id}')" class="text-gray-500 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100 text-sm" title="Refresh tools">⟳</button>
+        ${s.tools?.length ? `<button onclick="showMCPToolsModal('${s.id}')" class="text-gray-500 hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100 text-sm" title="View tools">🔧</button>` : ''}
         <button onclick="editMCPServer('${s.id}')" class="text-gray-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100" title="Edit">✏️</button>
         <button onclick="deleteMCPServer('${s.id}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100" title="Delete">🗑</button>
       </div>
@@ -1227,8 +1246,6 @@ document.getElementById('btn-add-mcp').onclick = () => {
   document.getElementById('mcp-auth-token').value = '';
   document.getElementById('mcp-enabled').checked = true;
   document.getElementById('modal-mcp-title').textContent = 'Add MCP Server';
-  document.getElementById('btn-list-tools').classList.add('hidden');
-  document.getElementById('mcp-tools-section').classList.add('hidden');
   openModal('mcp');
 };
 
@@ -1242,35 +1259,30 @@ async function editMCPServer(id) {
   document.getElementById('mcp-auth-token').value = s.authToken || '';
   document.getElementById('mcp-enabled').checked = s.enabled;
   document.getElementById('modal-mcp-title').textContent = 'Edit MCP Server';
-  const btnListTools = document.getElementById('btn-list-tools');
-  const toolsSection = document.getElementById('mcp-tools-section');
-  toolsSection.classList.add('hidden');
-  if (s.tools?.length) {
-    btnListTools.classList.remove('hidden');
-    btnListTools.dataset.tools = JSON.stringify(s.tools);
-  } else {
-    btnListTools.classList.add('hidden');
-  }
   openModal('mcp');
 }
 
-function showMCPTools() {
-  const btn = document.getElementById('btn-list-tools');
-  const tools = JSON.parse(btn.dataset.tools || '[]');
-  const list = document.getElementById('mcp-tools-list');
-  list.innerHTML = tools.map(t => `
-    <div class="text-xs text-gray-300 py-0.5">
-      <span class="font-semibold">${escapeHtml(t.name || '')}</span>
-      ${t.description ? `<span class="text-gray-500"> — ${escapeHtml(t.description)}</span>` : ''}
-    </div>
-  `).join('');
-  document.getElementById('mcp-tools-section').classList.remove('hidden');
-  btn.classList.add('hidden');
+function showMCPToolsModal(id) {
+  const s = state.mcpServers.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('modal-mcp-tools-title').textContent = `Tools — ${s.name}`;
+  const tbody = document.getElementById('mcp-tools-table-body');
+  const tools = s.tools || [];
+  if (tools.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" class="py-4 text-center text-gray-500 text-xs">No tools available</td></tr>';
+  } else {
+    tbody.innerHTML = tools.map(t => `
+      <tr class="border-b border-[#30363d] last:border-0">
+        <td class="py-2 pr-4 font-semibold text-gray-200 text-xs align-top">${escapeHtml(t.name || '')}</td>
+        <td class="py-2 text-gray-400 text-xs align-top">${t.description ? escapeHtml(t.description) : '<span class="text-gray-600">—</span>'}</td>
+      </tr>
+    `).join('');
+  }
+  document.getElementById('modal-mcp-tools').classList.remove('hidden');
 }
 
-function hideMCPTools() {
-  document.getElementById('mcp-tools-section').classList.add('hidden');
-  document.getElementById('btn-list-tools').classList.remove('hidden');
+function closeMCPToolsModal() {
+  document.getElementById('modal-mcp-tools').classList.add('hidden');
 }
 
 async function saveMCPServer(e) {
