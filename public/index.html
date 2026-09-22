@@ -409,7 +409,7 @@
           <tbody id="mcp-tools-table-body"></tbody>
         </table>
       </div>
-      <div class="flex justify-end pt-4">
+      <div class="flex justify-end pt-4 py-4">
         <button type="button" onclick="closeMCPToolsModal()" class="bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 px-5 rounded-xl transition-colors text-sm">Close</button>
       </div>
     </div>
@@ -1280,11 +1280,11 @@ function showMCPToolsModal(id) {
       </tr>
     `).join('');
   }
-  document.getElementById('modal-mcp-tools').classList.remove('hidden');
+  openModal('mcp-tools');
 }
 
 function closeMCPToolsModal() {
-  document.getElementById('modal-mcp-tools').classList.add('hidden');
+  closeModal();
 }
 
 async function saveMCPServer(e) {
