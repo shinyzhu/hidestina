@@ -258,6 +258,8 @@
         class="bg-[#252d3d] border border-[#30363d] text-gray-400 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-accent transition-colors">
         <option value="">Select model…</option>
       </select>
+      <!-- Tools dropdown backdrop -->
+      <div id="tools-dropdown-backdrop" class="hidden fixed inset-0 bg-black/40 z-40" onclick="closeToolsDropdown()"></div>
       <!-- Tools toggle dropdown -->
       <div class="relative" id="tools-dropdown-wrap">
         <button type="button" id="tools-toggle-btn" title="Select MCP tools for this chat"
@@ -266,7 +268,7 @@
           <span id="tools-toggle-label">Tools</span>
           <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <div id="tools-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-72 bg-[#1e2536] border border-[#30363d] rounded-xl shadow-2xl z-30 py-1 max-h-64 overflow-y-auto">
+        <div id="tools-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-64 bg-[#1e2536] border border-[#30363d] rounded-xl shadow-2xl z-50 py-1 overflow-y-auto" style="max-height:min(40vh,16rem)">
           <div id="tools-dropdown-items" class="text-xs"></div>
           <div id="tools-dropdown-empty" class="px-3 py-2 text-xs text-gray-600">No MCP servers configured</div>
         </div>
@@ -1449,18 +1451,30 @@ function onMcpServerToggle(e) {
   }
 }
 
+function closeToolsDropdown() {
+  document.getElementById('tools-dropdown').classList.add('hidden');
+  document.getElementById('tools-dropdown-backdrop').classList.add('hidden');
+}
+
 // Toggle dropdown visibility
 document.getElementById('tools-toggle-btn').addEventListener('click', function(e) {
   e.stopPropagation();
   const dropdown = document.getElementById('tools-dropdown');
-  dropdown.classList.toggle('hidden');
+  const backdrop = document.getElementById('tools-dropdown-backdrop');
+  const isHidden = dropdown.classList.contains('hidden');
+  if (isHidden) {
+    dropdown.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  } else {
+    closeToolsDropdown();
+  }
 });
 
 // Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('tools-dropdown-wrap');
   if (!wrap.contains(e.target)) {
-    document.getElementById('tools-dropdown').classList.add('hidden');
+    closeToolsDropdown();
   }
   const skillsWrap = document.getElementById('skills-dropdown-wrap');
   if (!skillsWrap.contains(e.target)) {
