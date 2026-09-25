@@ -2,6 +2,7 @@
 
 const OpenAI = require('openai');
 const store = require('../store');
+const logger = require('../logger');
 
 /**
  * Build an OpenAI client for the given provider id.
@@ -48,9 +49,10 @@ async function streamCompletion({ providerId, model, messages, tools, options = 
   if (tools && tools.length > 0) {
     params.tools = tools;
     params.tool_choice = 'auto';
+    logger.tools(tools.map((t) => t.function?.name || 'unknown'));
   }
 
-  console.log('Starting streamCompletion with params:', { providerId, model, messages, tools, options });
+  logger.info('LLM', `streamCompletion [model: ${model}]`);
 
   const stream = await client.chat.completions.create(params);
 
@@ -99,9 +101,10 @@ async function complete({ providerId, model, messages, tools, options = {} }) {
   if (tools && tools.length > 0) {
     params.tools = tools;
     params.tool_choice = 'auto';
+    logger.tools(tools.map((t) => t.function?.name || 'unknown'));
   }
 
-  console.log('Starting complete with params:', { providerId, model, messages, tools, options });
+  logger.debug('LLM', `complete [model: ${model}]`);
 
   const resp = await client.chat.completions.create(params);
   const message = resp.choices[0].message;

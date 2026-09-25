@@ -4,6 +4,7 @@ const { Router } = require('express');
 const store = require('../store');
 const llmService = require('../services/llmService');
 const mcpService = require('../services/mcpService');
+const logger = require('../logger');
 
 const router = Router();
 
@@ -21,6 +22,8 @@ const router = Router();
  */
 router.post('/:conversationId', async (req, res) => {
   const { conversationId } = req.params;
+  logger.info('CHAT', `started [${conversationId}]`);
+
   const conv = store.getConversation(conversationId);
   if (!conv) return res.status(404).json({ error: 'Conversation not found' });
 
@@ -46,7 +49,7 @@ router.post('/:conversationId', async (req, res) => {
       validFiles.push({ name: f.name.slice(0, 255), content: f.content });
     }
     if (rejectedFiles.length > 0) {
-      console.warn(`Rejected files exceeding size limit: ${rejectedFiles.join(', ')}`);
+      logger.warn('CHAT', `Files rejected (size limit): ${rejectedFiles.join(', ')}`);
     }
   }
 
@@ -174,6 +177,7 @@ router.post('/:conversationId', async (req, res) => {
           role: 'assistant',
           content: assistantContent,
         });
+        logger.info('CHAT', `completed [${conversationId}] [no tools]`);
         send({ type: 'done', message: assistantMessage });
         break;
       }
@@ -201,6 +205,7 @@ router.post('/:conversationId', async (req, res) => {
 
       // Send tool call events and execute them
       for (const tc of toolCalls) {
+        logger.debug('CHAT', `executing tool`, tc.function.name);
         send({ type: 'tool_call', toolCall: { id: tc.id, name: tc.function.name, arguments: tc.function.arguments } });
 
         const result = await mcpService.executeToolCall(

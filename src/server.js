@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const logger = require('./logger');
 
 const conversationsRouter = require('./routes/conversations');
 const chatRouter = require('./routes/chat');
@@ -66,7 +67,7 @@ app.get('/{*path}', staticLimiter, (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✈️ HiDestina running at http://localhost:${PORT}`);
+  logger.info('SERVER', `✈️ HiDestina running at http://localhost:${PORT}`);
 });
 
 module.exports = app;

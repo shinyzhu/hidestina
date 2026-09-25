@@ -3,6 +3,7 @@
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const store = require('../store');
+const logger = require('../logger');
 
 // Cache of connected MCP clients by server id
 const clientCache = new Map();
@@ -85,12 +86,15 @@ function buildMcpUrlCandidates(rawUrl) {
 
 async function getOrConnectClient(serverId) {
   if (clientCache.has(serverId)) {
+    logger.debug('MCP', `using cached client [${serverId}]`);
     return clientCache.get(serverId);
   }
 
   const server = store.getMCPServer(serverId);
   if (!server) throw new Error(`MCP server "${serverId}" not found`);
   if (!server.enabled) throw new Error(`MCP server "${server.name}" is disabled`);
+
+  logger.info('MCP', `connecting to "${server.name}"`);
 
   const client = new Client({ name: 'HiDestina', version: '1.0.0' });
 
@@ -114,6 +118,7 @@ async function getOrConnectClient(serverId) {
       await client.connect(transport);
       clientCache.set(serverId, client);
       client.onclose = () => clientCache.delete(serverId);
+      logger.info('MCP', `connected to "${server.name}" [${serverId}]`);
       return client;
     } catch (err) {
       failures.push(`streamable:${candidateUrl} -> ${err && err.message ? err.message : String(err)}`);
@@ -121,6 +126,7 @@ async function getOrConnectClient(serverId) {
   }
 
   const details = failures.length ? failures.slice(0, 5).join('; ') : 'No transport attempts were made';
+  logger.error('MCP', `failed to connect to "${server.name}"`);
   throw new Error(`Cannot connect to MCP server "${server.name}". Tried: ${details}`);
 }
 
@@ -140,6 +146,8 @@ async function listTools(serverId) {
   const client = await getOrConnectClient(serverId);
   const { tools } = await client.listTools();
 
+  logger.debug('MCP', `found ${tools.length} tools [${serverId}]`, tools.map((t) => t.name));
+
   // Persist tool definitions in the store for reference
   store.updateMCPServer(serverId, { tools });
 
@@ -150,8 +158,10 @@ async function listTools(serverId) {
  * Call a tool on a specific MCP server.
  */
 async function callTool(serverId, toolName, args) {
+  logger.toolCall(toolName, args);
   const client = await getOrConnectClient(serverId);
   const result = await client.callTool({ name: toolName, arguments: args });
+  logger.toolResult(toolName, result, true);
   return result;
 }
 
@@ -207,6 +217,7 @@ async function getAllEnabledTools(serverIds) {
 async function executeToolCall(qualifiedName, argsJson, toolToServer) {
   const mapping = toolToServer[qualifiedName];
   if (!mapping) {
+    logger.warn('MCP', `unknown tool called`, qualifiedName);
     return { error: `Unknown tool: ${qualifiedName}` };
   }
 
@@ -221,6 +232,7 @@ async function executeToolCall(qualifiedName, argsJson, toolToServer) {
     const result = await callTool(mapping.serverId, mapping.toolName, args);
     return result;
   } catch (err) {
+    logger.error('MCP', `tool execution failed [${qualifiedName}]`, err.message);
     return { error: err.message };
   }
 }
