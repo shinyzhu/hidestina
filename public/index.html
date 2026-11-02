@@ -355,8 +355,6 @@
         class="bg-[#252d3d] border border-[#30363d] text-gray-400 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-accent transition-colors">
         <option value="">Select model…</option>
       </select>
-      <!-- Tools dropdown backdrop -->
-      <div id="tools-dropdown-backdrop" class="hidden fixed inset-0 bg-black/40 z-40" onclick="closeToolsDropdown()"></div>
       <!-- Tools toggle dropdown -->
       <div class="relative" id="tools-dropdown-wrap">
         <button type="button" id="tools-toggle-btn" title="Select MCP tools for this chat"
@@ -1695,18 +1693,14 @@ function onMcpServerToggle(e) {
 
 function closeToolsDropdown() {
   document.getElementById('tools-dropdown').classList.add('hidden');
-  document.getElementById('tools-dropdown-backdrop').classList.add('hidden');
 }
 
 // Toggle dropdown visibility
 document.getElementById('tools-toggle-btn').addEventListener('click', function(e) {
   e.stopPropagation();
   const dropdown = document.getElementById('tools-dropdown');
-  const backdrop = document.getElementById('tools-dropdown-backdrop');
-  const isHidden = dropdown.classList.contains('hidden');
-  if (isHidden) {
+  if (dropdown.classList.contains('hidden')) {
     dropdown.classList.remove('hidden');
-    backdrop.classList.remove('hidden');
   } else {
     closeToolsDropdown();
   }
