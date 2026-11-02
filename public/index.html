@@ -784,9 +784,31 @@ document.getElementById('btn-delete-conv').onclick = () => deleteConversation(st
 function renderMessages(messages) {
   const container = document.getElementById('messages-container');
   container.innerHTML = '';
+
+  // A tool call and its result are stored as two separate messages. Merge them
+  // for rendering so history looks the same as the live streamed conversation:
+  // one card containing the call arguments and the result.
+  const toolResultsByCallId = new Map();
   for (const msg of messages) {
-    appendMessage(msg);
+    if (msg.role === 'tool' && msg.toolCallId) {
+      toolResultsByCallId.set(msg.toolCallId, msg);
+    }
   }
+  const mergedToolCallIds = new Set();
+  for (const msg of messages) {
+    if (msg.role === 'assistant' && Array.isArray(msg.toolCalls)) {
+      for (const tc of msg.toolCalls) {
+        if (tc.id && toolResultsByCallId.has(tc.id)) mergedToolCallIds.add(tc.id);
+      }
+    }
+  }
+
+  for (const msg of messages) {
+    // The matching tool result is rendered inside the assistant's call card.
+    if (msg.role === 'tool' && msg.toolCallId && mergedToolCallIds.has(msg.toolCallId)) continue;
+    appendMessage(msg, toolResultsByCallId);
+  }
+
   // Persisted messages are rendered as Markdown without highlighting. Apply the
   // same highlight.js pass used during streaming so code looks consistent when
   // reopening a conversation (and follows the active light/dark theme).
@@ -799,14 +821,14 @@ function renderMessages(messages) {
   });
 }
 
-function appendMessage(msg) {
+function appendMessage(msg, toolResultsByCallId) {
   const container = document.getElementById('messages-container');
-  const el = createMessageEl(msg);
+  const el = createMessageEl(msg, toolResultsByCallId);
   container.appendChild(el);
   return el;
 }
 
-function createMessageEl(msg) {
+function createMessageEl(msg, toolResultsByCallId) {
   const wrap = document.createElement('div');
 
   if (msg.role === 'user') {
@@ -825,7 +847,7 @@ function createMessageEl(msg) {
       <div class="flex-shrink-0 w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-sm mt-0.5">✈️</div>
       <div class="flex-1 min-w-0">
         <div class="prose-chat">${msg.content ? renderMarkdown(msg.content) : ''}</div>
-        ${renderToolCalls(msg.toolCalls)}
+        ${renderToolCalls(msg.toolCalls, toolResultsByCallId)}
       </div>`;
   } else if (msg.role === 'tool') {
     wrap.className = 'flex gap-3 animate-fade-in';
@@ -838,7 +860,7 @@ function createMessageEl(msg) {
             <span class="chevron">▶</span>
           </div>
           <div class="tool-call-body collapsed">
-            <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(msg.content || '')}</pre>
+            <pre class="text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">${escapeHtml(formatToolResult(msg.content))}</pre>
           </div>
         </div>
       </div>`;
@@ -862,22 +884,57 @@ function toggleToolCall(headerEl) {
   }
 }
 
-function renderToolCalls(toolCalls) {
+function formatToolArguments(raw) {
+  if (typeof raw !== 'string') {
+    try { return JSON.stringify(raw ?? {}, null, 2); } catch { return String(raw ?? ''); }
+  }
+  try {
+    return JSON.stringify(JSON.parse(raw || '{}'), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+function formatToolResult(raw) {
+  if (typeof raw !== 'string') {
+    try { return JSON.stringify(raw ?? '', null, 2); } catch { return String(raw ?? ''); }
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    // Only pretty-print structured results; plain text is left untouched.
+    if (parsed && typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
+  } catch {
+    // Not JSON — render the text as-is.
+  }
+  return raw;
+}
+
+function renderToolCalls(toolCalls, toolResultsByCallId) {
   if (!toolCalls || toolCalls.length === 0) return '';
-  return toolCalls.map(tc => `
-    <div class="mt-2 bg-[#1e2536] border border-[#30363d] rounded-xl p-3 text-xs">
-      <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
-        <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Tool Call</span>
-        <code class="text-purple-300 font-mono">${escapeHtml(tc.function?.name || '')}</code>
-        <span class="chevron">▶</span>
+  return toolCalls.map(tc => {
+    const resultMsg = toolResultsByCallId && tc.id ? toolResultsByCallId.get(tc.id) : null;
+    const hasResult = Boolean(resultMsg);
+    const resultText = hasResult ? formatToolResult(resultMsg.content) : '';
+    const argsText = formatToolArguments(tc.function?.arguments);
+    const toolName = escapeHtml(tc.function?.name || 'Tool');
+
+    return `
+      <div class="mt-2 bg-[#1e2536] border border-purple-900/50 rounded-xl p-3 text-xs overflow-hidden">
+        <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
+          <span class="tool-badge ${hasResult ? 'bg-green-900/50 text-green-300' : 'bg-purple-900/50 text-purple-300'}">${hasResult ? '✅ Done' : '⚡ Tool Call'}</span>
+          <code class="min-w-0 truncate text-purple-300 font-mono" title="${toolName}">${toolName}</code>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="tool-call-body collapsed">
+          <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">${escapeHtml(argsText)}</pre>
+          ${hasResult
+            ? `<div class="text-green-400 font-semibold mt-1 mb-0.5">Result:</div>
+               <pre class="text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">${escapeHtml(resultText)}</pre>`
+            : '<div class="text-gray-500 mt-1 text-[11px]">No result recorded.</div>'}
+        </div>
       </div>
-      <div class="tool-call-body collapsed">
-        <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(
-          (() => { try { return JSON.stringify(JSON.parse(tc.function?.arguments || '{}'), null, 2); } catch { return tc.function?.arguments || ''; } })()
-        )}</pre>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function scrollToBottom() {
@@ -1080,17 +1137,18 @@ async function sendMessage() {
           scrollToBottom();
         } else if (data.type === 'tool_call') {
           const tcEl = document.createElement('div');
-          tcEl.className = 'mt-2 bg-[#1e2536] border border-purple-900/50 rounded-xl p-3 text-xs animate-fade-in';
+          tcEl.className = 'mt-2 bg-[#1e2536] border border-purple-900/50 rounded-xl p-3 text-xs animate-fade-in overflow-hidden';
           tcEl.dataset.tcid = data.toolCall.id;
-          const args = (() => { try { return JSON.stringify(JSON.parse(data.toolCall.arguments || '{}'), null, 2); } catch { return data.toolCall.arguments || ''; } })();
+          const args = formatToolArguments(data.toolCall.arguments);
+          const toolName = escapeHtml(data.toolCall.name);
           tcEl.innerHTML = `
             <div class="tool-call-header flex items-center gap-2" onclick="toggleToolCall(this)">
               <span class="tool-badge bg-purple-900/50 text-purple-300">⚡ Calling</span>
-              <code class="text-purple-300 font-mono">${escapeHtml(data.toolCall.name)}</code>
+              <code class="min-w-0 truncate text-purple-300 font-mono" title="${toolName}">${toolName}</code>
               <span class="chevron open">▶</span>
             </div>
             <div class="tool-call-body expanded">
-              <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto">${escapeHtml(args)}</pre>
+              <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">${escapeHtml(args)}</pre>
               <div class="tool-result-area mt-1"></div>
             </div>`;
           toolEventsEl.appendChild(tcEl);
@@ -1099,8 +1157,8 @@ async function sendMessage() {
           const tcEl = toolEventsEl.querySelector(`[data-tcid="${data.toolCallId}"]`);
           if (tcEl) {
             const resultArea = tcEl.querySelector('.tool-result-area');
-            const resultStr = typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2);
-            resultArea.innerHTML = `<div class="text-green-400 font-semibold mt-1 mb-0.5">Result:</div><pre class="text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-40">${escapeHtml(resultStr)}</pre>`;
+            const resultStr = formatToolResult(data.result);
+            resultArea.innerHTML = `<div class="text-green-400 font-semibold mt-1 mb-0.5">Result:</div><pre class="text-gray-300 whitespace-pre-wrap overflow-x-auto overflow-y-auto max-h-40">${escapeHtml(resultStr)}</pre>`;
             // Update badge
             const badge = tcEl.querySelector('.tool-badge');
             if (badge) { badge.textContent = '✅ Done'; badge.className = 'tool-badge bg-green-900/50 text-green-300'; }
