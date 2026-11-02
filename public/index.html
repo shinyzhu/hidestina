@@ -381,11 +381,36 @@
           <div id="skills-dropdown-empty" class="px-3 py-2 text-xs text-gray-600">No skills configured</div>
         </div>
       </div>
-      <!-- Context length indicator -->
-      <div id="context-indicator" class="hidden flex items-center gap-1.5 text-xs text-gray-500 ml-auto" title="Estimated context usage" role="status" aria-live="polite">
-        <span id="context-indicator-label" aria-label="Estimated token usage">0 / 0</span>
-        <div class="w-16 h-1.5 bg-[#252d3d] rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div id="context-indicator-bar" class="h-full rounded-full transition-all duration-300" style="width: 0%; background: #7c6aff;"></div>
+      <!-- Context usage icon -->
+      <div id="context-indicator-wrap" class="relative ml-auto">
+        <button type="button" id="context-indicator" aria-haspopup="dialog" aria-expanded="false" title="Context usage"
+          class="flex items-center gap-1 rounded-lg border border-[#30363d] bg-[#252d3d] px-1.5 py-1 text-gray-500 hover:text-white transition-colors focus:outline-none focus:border-accent">
+          <svg viewBox="0 0 36 36" class="h-4 w-4" aria-hidden="true">
+            <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="5"></circle>
+            <circle id="context-indicator-ring" cx="18" cy="18" r="14" fill="none" stroke="#7c6aff" stroke-width="5"
+              stroke-linecap="round" transform="rotate(-90 18 18)" stroke-dasharray="87.96" stroke-dashoffset="87.96"
+              class="transition-all duration-300"></circle>
+          </svg>
+          <span id="context-indicator-label" class="text-[11px] font-semibold">0</span>
+        </button>
+        <div id="context-popover" role="dialog" aria-label="Context usage details"
+          class="hidden absolute right-0 bottom-full mb-2 w-64 rounded-xl border border-[#30363d] bg-[#1e2536] p-3 text-xs shadow-2xl z-50">
+          <div class="flex items-center justify-between gap-3">
+            <span class="font-semibold text-gray-200">Context usage</span>
+            <span id="context-popover-percent" class="font-semibold text-accent">—</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <span class="text-gray-500">Estimated</span>
+            <span id="context-popover-used" class="font-mono text-gray-200">0</span>
+          </div>
+          <div class="mt-1 flex items-center justify-between gap-3">
+            <span class="text-gray-500">Window</span>
+            <span id="context-popover-window" class="font-mono text-gray-200">Not set</span>
+          </div>
+          <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#252d3d]">
+            <div id="context-popover-bar" class="h-full rounded-full bg-accent transition-all duration-300" style="width:0%"></div>
+          </div>
+          <p id="context-popover-note" class="mt-2 text-[11px] leading-relaxed text-gray-500"></p>
         </div>
       </div>
     </div>
@@ -633,7 +658,7 @@ function closeModal() {
     if (m.id !== 'modal-backdrop') m.classList.add('hidden');
   });
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeContextPopover(); } });
 
 // ─── Settings tabs ────────────────────────────────────────────────────────────
 document.querySelectorAll('.settings-tab').forEach(btn => {
@@ -1252,35 +1277,89 @@ function getSelectedProviderContextLength() {
   return provider?.contextLength || 0;
 }
 
-function updateContextIndicator(messages) {
-  const indicator = document.getElementById('context-indicator');
-  const label = document.getElementById('context-indicator-label');
-  const bar = document.getElementById('context-indicator-bar');
-  const contextLength = getSelectedProviderContextLength();
+const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * 14;
 
-  if (!contextLength) {
-    indicator.classList.add('hidden');
-    return;
-  }
-
-  const tokenEstimate = estimateTokenCount(messages || []);
-  const pct = Math.min((tokenEstimate / contextLength) * 100, 100);
-
-  label.textContent = `~${formatTokenCount(tokenEstimate)} / ${formatTokenCount(contextLength)}`;
-  bar.style.width = pct + '%';
-  bar.parentElement.setAttribute('aria-valuenow', Math.round(pct));
-
-  // Color: purple (<50%), yellow (50-80%), red (>80%)
-  if (pct > 80) {
-    bar.style.background = '#ef4444';
-  } else if (pct > 50) {
-    bar.style.background = '#eab308';
-  } else {
-    bar.style.background = '#7c6aff';
-  }
-
-  indicator.classList.remove('hidden');
+function contextUsageColor(pct) {
+  if (pct > 80) return '#dc2626';
+  if (pct > 50) return '#d97706';
+  return '#7c6aff';
 }
+
+function updateContextIndicator(messages) {
+  const button = document.getElementById('context-indicator');
+  const label = document.getElementById('context-indicator-label');
+  const ring = document.getElementById('context-indicator-ring');
+  if (!button || !label || !ring) return;
+
+  const contextLength = getSelectedProviderContextLength();
+  const tokenEstimate = estimateTokenCount(messages ?? state.currentMessages ?? []);
+  const pct = contextLength ? Math.min((tokenEstimate / contextLength) * 100, 100) : 0;
+  const usedText = tokenEstimate > 0 ? `~${formatTokenCount(tokenEstimate)}` : '0';
+  const pctText = contextLength
+    ? (tokenEstimate > 0 && pct < 1 ? '<1%' : `${Math.round(pct)}%`)
+    : '—';
+  const color = contextUsageColor(pct);
+
+  // When the window size is unknown, show a dashed neutral ring plus the
+  // estimated token count. Once configured, the ring + label show a percentage.
+  if (contextLength) {
+    ring.style.strokeDasharray = `${CONTEXT_RING_CIRCUMFERENCE}`;
+    ring.style.strokeDashoffset = `${CONTEXT_RING_CIRCUMFERENCE * (1 - pct / 100)}`;
+    ring.style.stroke = color;
+    button.classList.remove('context-unknown');
+    label.textContent = pctText;
+    button.title = `Context: ~${formatTokenCount(tokenEstimate)} / ${formatTokenCount(contextLength)} tokens (${pctText})`;
+  } else {
+    ring.style.strokeDasharray = '4 4';
+    ring.style.strokeDashoffset = '0';
+    ring.style.stroke = '#64748b';
+    button.classList.add('context-unknown');
+    label.textContent = usedText;
+    button.title = `Context: ${usedText} tokens — context window not set`;
+  }
+  button.setAttribute('aria-label', button.title);
+
+  updateContextPopover(tokenEstimate, contextLength, pct, color);
+}
+
+function updateContextPopover(tokenEstimate, contextLength, pct, color) {
+  const used = tokenEstimate > 0 ? `~${formatTokenCount(tokenEstimate)}` : '0';
+  const pctText = contextLength
+    ? (tokenEstimate > 0 && pct < 1 ? '<1%' : `${Math.round(pct)}%`)
+    : '—';
+
+  document.getElementById('context-popover-used').textContent = used;
+  document.getElementById('context-popover-window').textContent = contextLength ? formatTokenCount(contextLength) : 'Not set';
+  const percentEl = document.getElementById('context-popover-percent');
+  percentEl.textContent = pctText;
+  percentEl.style.color = contextLength ? color : '';
+
+  const bar = document.getElementById('context-popover-bar');
+  bar.style.width = contextLength ? `${pct}%` : '0%';
+  bar.style.background = contextLength ? color : '#64748b';
+
+  document.getElementById('context-popover-note').textContent = contextLength
+    ? 'Estimated from message characters; actual token usage may differ.'
+    : 'Set Context Length in LLM provider settings to see a percentage.';
+}
+
+function closeContextPopover() {
+  const pop = document.getElementById('context-popover');
+  const button = document.getElementById('context-indicator');
+  if (!pop || !button) return;
+  pop.classList.add('hidden');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+document.getElementById('context-indicator').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const pop = document.getElementById('context-popover');
+  const willOpen = pop.classList.contains('hidden');
+  closeToolsDropdown();
+  document.getElementById('skills-dropdown').classList.add('hidden');
+  pop.classList.toggle('hidden', !willOpen);
+  this.setAttribute('aria-expanded', String(willOpen));
+});
 
 function renderLLMList() {
   const container = document.getElementById('llm-list');
@@ -1700,6 +1779,7 @@ document.getElementById('tools-toggle-btn').addEventListener('click', function(e
   e.stopPropagation();
   const dropdown = document.getElementById('tools-dropdown');
   if (dropdown.classList.contains('hidden')) {
+    closeContextPopover();
     dropdown.classList.remove('hidden');
   } else {
     closeToolsDropdown();
@@ -1715,6 +1795,10 @@ document.addEventListener('click', function(e) {
   const skillsWrap = document.getElementById('skills-dropdown-wrap');
   if (!skillsWrap.contains(e.target)) {
     document.getElementById('skills-dropdown').classList.add('hidden');
+  }
+  const contextWrap = document.getElementById('context-indicator-wrap');
+  if (contextWrap && !contextWrap.contains(e.target)) {
+    closeContextPopover();
   }
 });
 
@@ -1904,6 +1988,7 @@ function onSkillToggle(e) {
 // Toggle skills dropdown visibility
 document.getElementById('skills-toggle-btn').addEventListener('click', function(e) {
   e.stopPropagation();
+  closeContextPopover();
   const dropdown = document.getElementById('skills-dropdown');
   dropdown.classList.toggle('hidden');
 });
