@@ -71,6 +71,10 @@
     .skill-modal-panel { width: 100%; max-width: 600px; max-height: calc(100vh - 2rem); overflow-y: auto; }
     .skill-content-editor { min-height: 260px; max-height: 45vh; resize: vertical; }
 
+    /* Selected item in the custom model dropdown */
+    .model-option[aria-selected="true"] { background: rgba(124,106,255,0.12); }
+    html:not(.dark) .model-option[aria-selected="true"] { background: #ede9fe; }
+
     .mcp-tool-desc {
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -356,10 +360,18 @@
     <!-- Model & Tools selectors (below chat box) -->
     <div class="max-w-3xl mx-auto flex items-center gap-2 mt-1.5 px-1">
       <!-- Model selector -->
-      <select id="model-input" title="Select model"
-        class="bg-[#252d3d] border border-[#30363d] text-gray-400 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-accent transition-colors">
-        <option value="">Select model…</option>
-      </select>
+      <div class="relative" id="model-dropdown-wrap">
+        <button type="button" id="model-toggle-btn" title="Select model" aria-haspopup="listbox" aria-expanded="false"
+          class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors select-none bg-[#252d3d] border border-[#30363d] rounded-lg px-2 py-1 focus:outline-none focus:border-accent">
+          <span>🤖</span>
+          <span id="model-toggle-label" class="truncate" style="max-width: 170px">No model</span>
+          <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="model-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-64 bg-[#1e2536] border border-[#30363d] rounded-xl shadow-2xl z-50 py-1 overflow-y-auto" style="max-height:min(40vh,16rem)">
+          <div id="model-dropdown-items" role="listbox" aria-label="Select model" class="text-xs"></div>
+          <div id="model-dropdown-empty" class="hidden px-3 py-2 text-xs text-gray-600">No LLMs configured. Add one in the sidebar.</div>
+        </div>
+      </div>
       <!-- Tools toggle dropdown -->
       <div class="relative" id="tools-dropdown-wrap">
         <button type="button" id="tools-toggle-btn" title="Select MCP tools for this chat"
@@ -670,7 +682,7 @@ function closeModal() {
     if (m.id !== 'modal-backdrop') m.classList.add('hidden');
   });
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeContextPopover(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeContextPopover(); closeModelDropdown(); } });
 
 // ─── Settings tabs ────────────────────────────────────────────────────────────
 document.querySelectorAll('.settings-tab').forEach(btn => {
@@ -739,28 +751,20 @@ async function selectConversation(id) {
 }
 
 function restoreModelSelection(conv) {
-  const sel = document.getElementById('model-input');
-  if (conv.model && conv.providerId) {
-    // Try to match by provider ID
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].dataset.providerId === conv.providerId) {
-        sel.selectedIndex = i;
-        state.selectedProviderId = conv.providerId;
-        return;
-      }
-    }
+  let provider = state.llmProviders.find(p => p.id === conv.providerId);
+  if (!provider && conv.model) {
+    // Fallback: match by model name if the provider was removed or changed.
+    provider = state.llmProviders.find(p => p.model === conv.model);
   }
-  if (conv.model) {
-    // Fallback: match by model name
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === conv.model) {
-        sel.selectedIndex = i;
-        state.selectedProviderId = sel.options[i].dataset.providerId || null;
-        return;
-      }
-    }
+  if (!provider && state.llmProviders.length) {
+    // The conversation points at a provider/model that no longer exists.
+    // Normalize to the current selection so the header, selector and the model
+    // that will actually be used for the next message stay consistent.
+    provider = state.llmProviders.find(p => p.id === state.selectedProviderId) || state.llmProviders[0];
   }
-  // No match - keep current selection
+  if (provider) {
+    selectModel(provider.id, { persist: false });
+  }
 }
 
 function restoreMcpSelection(conv) {
@@ -784,7 +788,7 @@ function restoreSkillSelection(conv) {
 }
 
 async function createNewConversation() {
-  const model = document.getElementById('model-input').value || '';
+  const model = getSelectedModel();
   const providerId = state.selectedProviderId || '';
   const enabledMcpServers = state.enabledMcpServerIds;
   const enabledSkills = state.enabledSkillIds;
@@ -1082,7 +1086,7 @@ async function sendMessage() {
   }
 
   // Require a model
-  const model = document.getElementById('model-input').value;
+  const model = getSelectedModel();
   if (!model) {
     toast('Please select a model first', 'error');
     return;
@@ -1242,24 +1246,115 @@ async function loadLLMProviders() {
   populateModelDropdown();
 }
 
+function getSelectedModel() {
+  const provider = state.llmProviders.find(p => p.id === state.selectedProviderId);
+  return provider?.model || '';
+}
+
+function updateModelToggle() {
+  const provider = state.llmProviders.find(p => p.id === state.selectedProviderId);
+  const label = document.getElementById('model-toggle-label');
+  const button = document.getElementById('model-toggle-btn');
+
+  if (provider) {
+    label.textContent = provider.model || provider.name;
+    label.title = `${provider.name} — ${provider.model}`;
+    button.title = `Select model — ${provider.name} / ${provider.model}`;
+  } else {
+    label.textContent = state.llmProviders.length ? 'Select model' : 'No model';
+    label.title = '';
+    button.title = 'Select model';
+  }
+}
+
+function updateModelOptionsSelection() {
+  document.querySelectorAll('#model-dropdown-items .model-option').forEach(option => {
+    const selected = option.dataset.providerId === state.selectedProviderId;
+    option.setAttribute('aria-selected', selected ? 'true' : 'false');
+    const check = option.querySelector('.model-option-check');
+    if (check) check.classList.toggle('hidden', !selected);
+  });
+}
+
+function closeModelDropdown() {
+  const dropdown = document.getElementById('model-dropdown');
+  const button = document.getElementById('model-toggle-btn');
+  if (!dropdown || !button) return;
+  dropdown.classList.add('hidden');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+function selectModel(providerId, { persist = false } = {}) {
+  const provider = state.llmProviders.find(p => p.id === providerId) || null;
+  state.selectedProviderId = provider ? provider.id : null;
+
+  updateModelToggle();
+  updateModelOptionsSelection();
+  if (provider) {
+    document.getElementById('conv-model').textContent = `Model: ${provider.model}`;
+  }
+  updateContextIndicator(state.currentMessages || []);
+
+  if (persist && provider && state.currentConvId) {
+    api('PATCH', `/conversations/${state.currentConvId}`, {
+      model: provider.model,
+      providerId: provider.id,
+    }).catch(() => {});
+  }
+  closeModelDropdown();
+}
+
 function populateModelDropdown() {
-  const sel = document.getElementById('model-input');
+  const itemsEl = document.getElementById('model-dropdown-items');
+  const emptyEl = document.getElementById('model-dropdown-empty');
+
   if (!state.llmProviders.length) {
-    sel.innerHTML = '<option value="">No LLMs added yet</option>';
-    document.getElementById('conv-model').textContent = 'No model selected';
+    itemsEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
     state.selectedProviderId = null;
+    updateModelToggle();
+    document.getElementById('conv-model').textContent = 'No model selected';
     updateContextIndicator();
     return;
   }
-  sel.innerHTML = state.llmProviders.map((p, i) =>
-    `<option value="${escapeHtml(p.model)}" data-provider-id="${escapeHtml(p.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.model)})</option>`
-  ).join('');
-  // Auto-select first provider
-  const first = state.llmProviders[0];
-  state.selectedProviderId = first.id;
-  document.getElementById('conv-model').textContent = `Model: ${first.model}`;
-  updateContextIndicator();
+
+  emptyEl.classList.add('hidden');
+  itemsEl.innerHTML = state.llmProviders.map(p => `
+    <button type="button" role="option" aria-selected="false"
+      class="model-option flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-[#252d3d]"
+      data-provider-id="${escapeHtml(p.id)}" title="${escapeHtml(p.name)} — ${escapeHtml(p.model)}">
+      <span class="min-w-0 flex-1">
+        <span class="block truncate font-semibold text-gray-200">${escapeHtml(p.name)}</span>
+        <span class="block truncate text-[11px] text-gray-500">${escapeHtml(p.model)}</span>
+      </span>
+      <span class="model-option-check mt-0.5 hidden shrink-0 text-accent">✓</span>
+    </button>
+  `).join('');
+
+  itemsEl.querySelectorAll('.model-option').forEach(option => {
+    option.addEventListener('click', () => {
+      selectModel(option.dataset.providerId, { persist: true });
+    });
+  });
+
+  // Keep the current selection when possible; otherwise fall back to the first.
+  const current = state.llmProviders.find(p => p.id === state.selectedProviderId);
+  selectModel((current || state.llmProviders[0]).id, { persist: false });
 }
+
+document.getElementById('model-toggle-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('model-dropdown');
+  const willOpen = dropdown.classList.contains('hidden');
+  if (willOpen) {
+    closeToolsDropdown();
+    document.getElementById('skills-dropdown').classList.add('hidden');
+    closeContextPopover();
+    updateModelOptionsSelection();
+  }
+  dropdown.classList.toggle('hidden', !willOpen);
+  this.setAttribute('aria-expanded', String(willOpen));
+});
 
 // ─── Context Length Indicator ─────────────────────────────────────────────────
 
@@ -1369,6 +1464,7 @@ document.getElementById('context-indicator').addEventListener('click', function(
   const willOpen = pop.classList.contains('hidden');
   closeToolsDropdown();
   document.getElementById('skills-dropdown').classList.add('hidden');
+  closeModelDropdown();
   pop.classList.toggle('hidden', !willOpen);
   this.setAttribute('aria-expanded', String(willOpen));
 });
@@ -1390,24 +1486,6 @@ function renderLLMList() {
     </div>
   `).join('');
 }
-
-document.getElementById('model-input').addEventListener('change', function() {
-  const selected = this.options[this.selectedIndex];
-  const providerId = selected ? selected.dataset.providerId : null;
-  state.selectedProviderId = providerId || null;
-  document.getElementById('conv-model').textContent = this.value ? `Model: ${this.value}` : 'No model selected';
-
-  // Update context indicator for new provider
-  updateContextIndicator(state.currentMessages || []);
-
-  // Save model selection to current conversation
-  if (state.currentConvId && this.value) {
-    api('PATCH', `/conversations/${state.currentConvId}`, {
-      model: this.value,
-      providerId: providerId || '',
-    }).catch(() => {});
-  }
-});
 
 document.getElementById('btn-add-llm').onclick = () => {
   document.getElementById('llm-id').value = '';
@@ -1795,12 +1873,18 @@ function closeToolsDropdown() {
   document.getElementById('tools-dropdown').classList.add('hidden');
 }
 
+function closeSkillsDropdown() {
+  document.getElementById('skills-dropdown').classList.add('hidden');
+}
+
 // Toggle dropdown visibility
 document.getElementById('tools-toggle-btn').addEventListener('click', function(e) {
   e.stopPropagation();
   const dropdown = document.getElementById('tools-dropdown');
   if (dropdown.classList.contains('hidden')) {
     closeContextPopover();
+    closeModelDropdown();
+    closeSkillsDropdown();
     dropdown.classList.remove('hidden');
   } else {
     closeToolsDropdown();
@@ -1820,6 +1904,10 @@ document.addEventListener('click', function(e) {
   const contextWrap = document.getElementById('context-indicator-wrap');
   if (contextWrap && !contextWrap.contains(e.target)) {
     closeContextPopover();
+  }
+  const modelWrap = document.getElementById('model-dropdown-wrap');
+  if (modelWrap && !modelWrap.contains(e.target)) {
+    closeModelDropdown();
   }
 });
 
@@ -2003,6 +2091,8 @@ function onSkillToggle(e) {
 document.getElementById('skills-toggle-btn').addEventListener('click', function(e) {
   e.stopPropagation();
   closeContextPopover();
+  closeModelDropdown();
+  closeToolsDropdown();
   const dropdown = document.getElementById('skills-dropdown');
   dropdown.classList.toggle('hidden');
 });
