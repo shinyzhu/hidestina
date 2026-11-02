@@ -32,8 +32,8 @@
     .prose-chat p { margin: 0 0 0.75em; }
     .prose-chat p:last-child { margin-bottom: 0; }
     .prose-chat pre { background: #0d1117; border: 1px solid #30363d; border-radius: 0.5rem; padding: 1rem; overflow-x: auto; margin: 0.75em 0; }
-    .prose-chat code { background: #21262d; padding: 0.125em 0.35em; border-radius: 0.25rem; font-size: 0.85em; color: #e6edf3; }
-    .prose-chat pre code { background: transparent; padding: 0; }
+    .prose-chat code { background: #21262d; padding: 0.125em 0.35em; border-radius: 0.25rem; font-size: 0.875em; color: #e6edf3; }
+    .prose-chat pre code { background: transparent; padding: 0; font-size: 0.875rem; }
     .prose-chat ul, .prose-chat ol { padding-left: 1.5em; margin: 0.5em 0; }
     .prose-chat li { margin: 0.25em 0; }
     .prose-chat a { color: #7c6aff; text-decoration: underline; }
@@ -113,6 +113,7 @@
 
     /* Backgrounds */
     html:not(.dark) .bg-\[\#0f1117\]                         { background-color: #f8fafc; }
+    html:not(.dark) .bg-accent                              { background-color: #6a5ae0; }
     html:not(.dark) .bg-\[\#161b27\]                         { background-color: #ffffff; }
     html:not(.dark) .bg-\[\#161b27\]\/80                     { background-color: rgba(255,255,255,0.85); }
     html:not(.dark) .bg-\[\#1e2536\]                         { background-color: #f1f5f9; }
@@ -128,9 +129,36 @@
     /* Text — body text and headings on surface backgrounds */
     html:not(.dark) .text-gray-200                           { color: #1e293b; }
     html:not(.dark) .text-gray-300                           { color: #374151; }
+    html:not(.dark) .text-gray-400                           { color: #475569; }
+    html:not(.dark) .text-gray-500                           { color: #4b5563; }
     html:not(.dark) .text-white                              { color: #0f172a; }
     html:not(.dark) .hover\:text-white:hover                 { color: #0f172a; }
     html:not(.dark) .group:hover .group-hover\:text-white    { color: #0f172a; }
+
+    /* Accent / status text on light surfaces */
+    html:not(.dark) .text-accent                             { color: #5b4fcf; }
+    html:not(.dark) .hover\:text-accent:hover                { color: #5b4fcf; }
+    html:not(.dark) .hover\:text-accent-light:hover          { color: #7c6aff; }
+    html:not(.dark) .text-red-400                            { color: #b91c1c; }
+    html:not(.dark) .hover\:text-red-400:hover,
+    html:not(.dark) .hover\:text-red-300:hover               { color: #b91c1c; }
+    html:not(.dark) .text-blue-400                           { color: #1d4ed8; }
+    html:not(.dark) .hover\:text-blue-400:hover              { color: #1d4ed8; }
+    html:not(.dark) .hover\:text-yellow-400:hover            { color: #a16207; }
+    html:not(.dark) .text-purple-300                         { color: #6d28d9; }
+    html:not(.dark) .text-green-300,
+    html:not(.dark) .text-green-400                          { color: #166534; }
+
+    /* Tool call / result cards */
+    html:not(.dark) .bg-purple-900\/50                       { background-color: #ede9fe; }
+    html:not(.dark) .border-purple-900\/50                   { border-color: #ddd6fe; }
+    html:not(.dark) .bg-green-900\/50,
+    html:not(.dark) .bg-green-900\/40                        { background-color: #dcfce7; }
+    html:not(.dark) .bg-green-400                            { background-color: #16a34a; }
+
+    /* Native controls follow the active theme */
+    html.dark                                                { color-scheme: dark; }
+    html:not(.dark)                                          { color-scheme: light; }
 
     /* Restore white text on intentionally coloured backgrounds */
     html:not(.dark) .bg-accent.text-white,
@@ -144,14 +172,57 @@
     /* Scrollbar */
     html:not(.dark) ::-webkit-scrollbar-thumb               { background: #c4c9d4; }
 
-    /* Code blocks — override highlight.js dark background */
+    /* Code blocks — GitHub Light token colors, scoped to light mode.
+       The dark theme stylesheet is always loaded, so its light-on-dark token
+       colors must be overridden here rather than only fixing the background. */
     html:not(.dark) .hljs                                    { background: #f6f8fa; color: #24292e; }
+    html:not(.dark) .hljs-doctag,
+    html:not(.dark) .hljs-keyword,
+    html:not(.dark) .hljs-meta .hljs-keyword,
+    html:not(.dark) .hljs-template-tag,
+    html:not(.dark) .hljs-template-variable,
+    html:not(.dark) .hljs-type,
+    html:not(.dark) .hljs-variable.language_                 { color: #b31d28; }
+    html:not(.dark) .hljs-title,
+    html:not(.dark) .hljs-title.class_,
+    html:not(.dark) .hljs-title.class_.inherited__,
+    html:not(.dark) .hljs-title.function_                    { color: #6f42c1; }
+    html:not(.dark) .hljs-attr,
+    html:not(.dark) .hljs-attribute,
+    html:not(.dark) .hljs-literal,
+    html:not(.dark) .hljs-meta,
+    html:not(.dark) .hljs-number,
+    html:not(.dark) .hljs-operator,
+    html:not(.dark) .hljs-selector-attr,
+    html:not(.dark) .hljs-selector-class,
+    html:not(.dark) .hljs-selector-id,
+    html:not(.dark) .hljs-variable                           { color: #005cc5; }
+    html:not(.dark) .hljs-meta .hljs-string,
+    html:not(.dark) .hljs-regexp,
+    html:not(.dark) .hljs-string                             { color: #032f62; }
+    html:not(.dark) .hljs-built_in,
+    html:not(.dark) .hljs-symbol                             { color: #b45309; }
+    html:not(.dark) .hljs-code,
+    html:not(.dark) .hljs-comment,
+    html:not(.dark) .hljs-formula                            { color: #57606a; }
+    html:not(.dark) .hljs-name,
+    html:not(.dark) .hljs-quote,
+    html:not(.dark) .hljs-selector-pseudo,
+    html:not(.dark) .hljs-selector-tag                       { color: #1a7f37; }
+    html:not(.dark) .hljs-subst                              { color: #24292e; }
+    html:not(.dark) .hljs-section                            { color: #005cc5; font-weight: 700; }
+    html:not(.dark) .hljs-bullet                             { color: #735c0f; }
+    html:not(.dark) .hljs-emphasis                           { color: #24292e; font-style: italic; }
+    html:not(.dark) .hljs-strong                             { color: #24292e; font-weight: 700; }
+    html:not(.dark) .hljs-addition                           { color: #1a7f37; background-color: #f0fff4; }
+    html:not(.dark) .hljs-deletion                           { color: #b31d28; background-color: #ffeef0; }
 
     /* Prose chat (AI messages) */
     html:not(.dark) .prose-chat                              { color: #1e293b; }
-    html:not(.dark) .prose-chat pre                          { background: #f6f8fa; border-color: #e2e8f0; }
+    html:not(.dark) .prose-chat pre                          { background: #f6f8fa; border-color: #d8dee4; }
     html:not(.dark) .prose-chat code                         { background: #f0f4f8; color: #374151; }
     html:not(.dark) .prose-chat pre code                     { background: transparent; color: inherit; }
+    html:not(.dark) .prose-chat a                            { color: #5b4fcf; }
     html:not(.dark) .prose-chat h1,
     html:not(.dark) .prose-chat h2,
     html:not(.dark) .prose-chat h3                           { color: #0f172a; }
@@ -716,6 +787,16 @@ function renderMessages(messages) {
   for (const msg of messages) {
     appendMessage(msg);
   }
+  // Persisted messages are rendered as Markdown without highlighting. Apply the
+  // same highlight.js pass used during streaming so code looks consistent when
+  // reopening a conversation (and follows the active light/dark theme).
+  container.querySelectorAll('pre code').forEach(code => {
+    try {
+      hljs.highlightElement(code);
+    } catch {
+      // Unsupported language: leave the block as plain text.
+    }
+  });
 }
 
 function appendMessage(msg) {
@@ -991,7 +1072,11 @@ async function sendMessage() {
         if (data.type === 'delta') {
           accumulated += data.content;
           contentEl.innerHTML = renderMarkdown(accumulated);
-          hljs.highlightAll();
+          // Highlight only this message; scanning the whole document on every
+          // token re-processes all previous (already highlighted) code blocks.
+          contentEl.querySelectorAll('pre code').forEach(code => {
+            try { hljs.highlightElement(code); } catch { /* unsupported language */ }
+          });
           scrollToBottom();
         } else if (data.type === 'tool_call') {
           const tcEl = document.createElement('div');
