@@ -66,6 +66,11 @@
 
     /* MCP tools modal — compact, fixed-height panel with 2-line descriptions */
     .mcp-tools-panel { width: 100%; max-width: 460px; max-height: min(65vh, 480px); }
+
+    /* Skill editor modal — wider than the other forms and scrollable on short screens */
+    .skill-modal-panel { width: 100%; max-width: 600px; max-height: calc(100vh - 2rem); overflow-y: auto; }
+    .skill-content-editor { min-height: 260px; max-height: 45vh; resize: vertical; }
+
     .mcp-tool-desc {
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -534,7 +539,7 @@
 
 <!-- Skill Modal -->
 <div id="modal-skill" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-slide-up">
+  <div class="skill-modal-panel bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl pointer-events-auto animate-slide-up">
     <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
       <h3 id="modal-skill-title" class="font-semibold text-white text-lg">Add Skill</h3>
       <button onclick="closeModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
@@ -556,15 +561,22 @@
         <label for="skill-enabled" class="text-sm text-gray-300 cursor-pointer">Enabled</label>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-gray-400 mb-1">Skill File (.md)</label>
-        <div class="flex items-center gap-2">
-          <label class="flex-1 flex items-center gap-2 bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-sm text-gray-400 cursor-pointer hover:border-accent transition-colors">
-            <span id="skill-file-label" class="truncate">No file chosen</span>
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <label for="skill-content" class="text-xs font-semibold text-gray-400">Content</label>
+          <div class="flex items-center gap-3">
+            <span id="skill-content-count" class="text-[11px] text-gray-500">0 chars</span>
+            <button type="button" title="Import content from a Markdown file"
+              onclick="document.getElementById('skill-file-input').click()"
+              class="text-[11px] font-semibold text-accent hover:text-accent-light transition-colors">Import .md</button>
             <input type="file" id="skill-file-input" accept=".md,text/markdown" class="hidden" onchange="handleSkillFileUpload(this)" />
-          </label>
-          <button type="button" id="skill-file-clear" class="hidden text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded" onclick="clearSkillFileUpload()">Clear</button>
+          </div>
         </div>
-        <input type="hidden" id="skill-content" />
+        <textarea id="skill-content" rows="12" placeholder="Write the skill instructions in Markdown…"
+          aria-describedby="skill-content-hint"
+          class="skill-content-editor w-full bg-[#252d3d] border border-[#30363d] rounded-xl px-3 py-2 text-xs font-mono text-gray-200 placeholder-gray-600 leading-relaxed focus:outline-none focus:border-accent transition-colors"></textarea>
+        <p id="skill-content-hint" class="mt-1 text-[11px] leading-relaxed text-gray-500">
+          Markdown supported. Content is injected as a system message when this skill is enabled.
+        </p>
       </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="flex-1 bg-accent hover:bg-accent-dark text-white font-semibold py-2 rounded-xl transition-colors text-sm">Save</button>
@@ -1638,6 +1650,14 @@ async function deleteMCPServer(id) {
   await loadMCPServers();
 }
 
+function updateSkillContentCount() {
+  const editor = document.getElementById('skill-content');
+  const counter = document.getElementById('skill-content-count');
+  if (!editor || !counter) return;
+  const length = editor.value.length;
+  counter.textContent = `${length.toLocaleString()} char${length === 1 ? '' : 's'}`;
+}
+
 function handleSkillFileUpload(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1646,11 +1666,17 @@ function handleSkillFileUpload(input) {
     input.value = '';
     return;
   }
+  const editor = document.getElementById('skill-content');
+  if (editor.value.trim() && !confirm('Replace the current skill content with this file?')) {
+    input.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById('skill-content').value = e.target.result;
-    document.getElementById('skill-file-label').textContent = file.name;
-    document.getElementById('skill-file-clear').classList.remove('hidden');
+    editor.value = e.target.result;
+    updateSkillContentCount();
+    toast(`Imported ${file.name}`, 'success');
+    input.value = '';
   };
   reader.onerror = function() {
     toast('Failed to read skill file', 'error');
@@ -1659,12 +1685,7 @@ function handleSkillFileUpload(input) {
   reader.readAsText(file);
 }
 
-function clearSkillFileUpload() {
-  document.getElementById('skill-content').value = '';
-  document.getElementById('skill-file-input').value = '';
-  document.getElementById('skill-file-label').textContent = 'No file chosen';
-  document.getElementById('skill-file-clear').classList.add('hidden');
-}
+document.getElementById('skill-content').addEventListener('input', updateSkillContentCount);
 
 async function refreshMCPServer(id) {
   try {
@@ -1836,8 +1857,7 @@ document.getElementById('btn-add-skill').onclick = () => {
   document.getElementById('skill-enabled').checked = true;
   document.getElementById('skill-content').value = '';
   document.getElementById('skill-file-input').value = '';
-  document.getElementById('skill-file-label').textContent = 'No file chosen';
-  document.getElementById('skill-file-clear').classList.add('hidden');
+  updateSkillContentCount();
   document.getElementById('modal-skill-title').textContent = 'Add Skill';
   openModal('skill');
 };
@@ -1851,13 +1871,7 @@ async function editSkill(id) {
   document.getElementById('skill-enabled').checked = s.enabled;
   document.getElementById('skill-content').value = s.content || '';
   document.getElementById('skill-file-input').value = '';
-  if (s.content) {
-    document.getElementById('skill-file-label').textContent = 'skill.md (loaded)';
-    document.getElementById('skill-file-clear').classList.remove('hidden');
-  } else {
-    document.getElementById('skill-file-label').textContent = 'No file chosen';
-    document.getElementById('skill-file-clear').classList.add('hidden');
-  }
+  updateSkillContentCount();
   document.getElementById('modal-skill-title').textContent = 'Edit Skill';
   openModal('skill');
 }
