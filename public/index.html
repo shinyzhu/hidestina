@@ -45,6 +45,7 @@
     .prose-chat table { width: 100%; border-collapse: collapse; margin: 0.5em 0; }
     .prose-chat th, .prose-chat td { border: 1px solid #30363d; padding: 0.4em 0.75em; }
     .prose-chat th { background: #161b27; color: #e2e8f0; }
+    .assistant-text:empty { display: none; }
 
     /* Typing indicator */
     .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #7c6aff; margin: 0 2px; animation: pulseDot 1.4s ease-in-out infinite; }
@@ -1127,14 +1128,17 @@ async function sendMessage() {
   assistantEl.innerHTML = `
     <div class="flex-shrink-0 w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-sm mt-0.5">✈️</div>
     <div class="flex-1 min-w-0">
-      <div class="prose-chat assistant-content"></div>
-      <div class="tool-events"></div>
+      <div class="assistant-transcript"></div>
     </div>`;
   document.getElementById('messages-container').appendChild(assistantEl);
-  const contentEl = assistantEl.querySelector('.assistant-content');
-  const toolEventsEl = assistantEl.querySelector('.tool-events');
-  scrollToBottom();
-
+  const transcriptEl = assistantEl.querySelector('.assistant-transcript');
+  const startTextSegment = (withTopMargin = false) => {
+    const el = document.createElement('div');
+    el.className = `prose-chat assistant-text${withTopMargin ? ' mt-2' : ''}`;
+    transcriptEl.appendChild(el);
+    return el;
+  };
+  let contentEl = startTextSegment(false);
   let accumulated = '';
 
   try {
@@ -1163,9 +1167,22 @@ async function sendMessage() {
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
-        const data = JSON.parse(line.slice(6));
+        let data;
+        try {
+          data = JSON.parse(line.slice(6));
+        } catch {
+          // Ignore a malformed event instead of aborting the whole stream.
+          continue;
+        }
 
         if (data.type === 'delta') {
+          if (!data.content) {
+            // Backward-compatible boundary for servers that sent an empty delta
+            // between tool rounds. Never use it to clear the previous text.
+            contentEl = startTextSegment(true);
+            accumulated = '';
+            continue;
+          }
           accumulated += data.content;
           contentEl.innerHTML = renderMarkdown(accumulated);
           // Highlight only this message; scanning the whole document on every
@@ -1173,6 +1190,12 @@ async function sendMessage() {
           contentEl.querySelectorAll('pre code').forEach(code => {
             try { hljs.highlightElement(code); } catch { /* unsupported language */ }
           });
+          scrollToBottom();
+        } else if (data.type === 'round_end') {
+          // Keep the text from the completed round above its tool cards and
+          // start a fresh text block for the next round.
+          contentEl = startTextSegment(true);
+          accumulated = '';
           scrollToBottom();
         } else if (data.type === 'tool_call') {
           const tcEl = document.createElement('div');
@@ -1190,10 +1213,10 @@ async function sendMessage() {
               <pre class="text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">${escapeHtml(args)}</pre>
               <div class="tool-result-area mt-1"></div>
             </div>`;
-          toolEventsEl.appendChild(tcEl);
+          transcriptEl.appendChild(tcEl);
           scrollToBottom();
         } else if (data.type === 'tool_result') {
-          const tcEl = toolEventsEl.querySelector(`[data-tcid="${data.toolCallId}"]`);
+          const tcEl = transcriptEl.querySelector(`[data-tcid="${data.toolCallId}"]`);
           if (tcEl) {
             const resultArea = tcEl.querySelector('.tool-result-area');
             const resultStr = formatToolResult(data.result);
@@ -1206,11 +1229,15 @@ async function sendMessage() {
             const chevron = tcEl.querySelector('.chevron');
             if (body) { body.classList.remove('expanded'); body.classList.add('collapsed'); }
             if (chevron) { chevron.classList.remove('open'); }
-            // Reset for next round
-            accumulated = '';
           }
           scrollToBottom();
         } else if (data.type === 'done') {
+          const hasText = [...transcriptEl.querySelectorAll('.assistant-text')]
+            .some(el => el.textContent.trim());
+          if (!hasText) {
+            contentEl.innerHTML = renderMarkdown('No text response was returned. Expand the tool cards to inspect the results.');
+            scrollToBottom();
+          }
           // Final — update conversation header
           await loadConversations();
           const conv = state.conversations.find(c => c.id === state.currentConvId);
@@ -1228,7 +1255,10 @@ async function sendMessage() {
       }
     }
   } catch (err) {
-    contentEl.innerHTML = `<div class="text-red-400 text-sm">❌ ${escapeHtml(err.message)}</div>`;
+    const errEl = document.createElement('div');
+    errEl.className = 'mt-2 text-red-400 text-sm';
+    errEl.textContent = `❌ ${err.message}`;
+    contentEl.appendChild(errEl);
     toast(err.message, 'error');
   } finally {
     typingEl.classList.add('hidden');

@@ -17,6 +17,7 @@ const router = Router();
  *   data: {"type":"delta","content":"..."}
  *   data: {"type":"tool_call","toolCall":{...}}
  *   data: {"type":"tool_result","toolCall":{...},"result":{...}}
+ *   data: {"type":"round_end"}
  *   data: {"type":"done","message":{...}}
  *   data: {"type":"error","error":"..."}
  */
@@ -146,17 +147,23 @@ router.post('/:conversationId', async (req, res) => {
     }
 
     let assistantMessage = null;
+    let completed = false;
 
-    // Agentic loop: allow multiple tool call rounds
+    // Agentic loop: allow multiple tool-call rounds. The last round is forced
+    // to answer without tools so a turn cannot get stuck in a tool-only loop.
     const MAX_ROUNDS = 10;
+    const EMPTY_FINAL_NOTICE = 'The model returned an empty response. Please try again or rephrase your request.';
+    const MAX_ROUNDS_NOTICE = 'The assistant reached the maximum number of tool-call rounds without producing a final answer. Please refine your request or check the tool results above.';
+
     for (let round = 0; round < MAX_ROUNDS; round++) {
       let done = false;
+      const isLastRound = round === MAX_ROUNDS - 1;
 
       await llmService.streamCompletion({
         providerId: effectiveProviderId,
         model,
         messages,
-        tools: openaiTools,
+        tools: isLastRound ? [] : openaiTools,
         options,
         onChunk: (text) => send({ type: 'delta', content: text }),
         onDone: (msg) => {
@@ -168,17 +175,23 @@ router.post('/:conversationId', async (req, res) => {
       if (!done) break;
 
       const { toolCalls } = assistantMessage;
-      const assistantContent = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
+      let assistantContent = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
       assistantMessage.content = assistantContent;
 
       if (!toolCalls || toolCalls.length === 0) {
-        // No tool calls → final answer
+        // No tool calls → final answer. Never finish a turn with no visible text.
+        if (!assistantContent.trim()) {
+          assistantContent = EMPTY_FINAL_NOTICE;
+          logger.warn('CHAT', `empty final response [${conversationId}]`);
+          send({ type: 'delta', content: assistantContent });
+        }
         store.addMessage(conversationId, {
           role: 'assistant',
           content: assistantContent,
         });
         logger.info('CHAT', `completed [${conversationId}] [no tools]`);
-        send({ type: 'done', message: assistantMessage });
+        send({ type: 'done', message: { role: 'assistant', content: assistantContent } });
+        completed = true;
         break;
       }
 
@@ -234,9 +247,18 @@ router.post('/:conversationId', async (req, res) => {
         });
       }
 
-      // Reset streaming state for next round
+      // All tools for this round are done. This is an explicit UI boundary:
+      // the client starts a fresh text block after the tool cards, preserving
+      // text from the previous round instead of clearing it.
       assistantMessage = null;
-      send({ type: 'delta', content: '' }); // separator
+      send({ type: 'round_end' });
+    }
+
+    if (!completed) {
+      logger.warn('CHAT', `max rounds reached [${conversationId}]`);
+      store.addMessage(conversationId, { role: 'assistant', content: MAX_ROUNDS_NOTICE });
+      send({ type: 'delta', content: MAX_ROUNDS_NOTICE });
+      send({ type: 'done', message: { role: 'assistant', content: MAX_ROUNDS_NOTICE } });
     }
   } catch (err) {
     send({ type: 'error', error: err.message });
