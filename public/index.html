@@ -64,6 +64,32 @@
     /* Tool badge */
     .tool-badge { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.15em 0.55em; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; }
 
+    /* MCP tools modal — compact, fixed-height panel with 2-line descriptions */
+    .mcp-tools-panel { width: 100%; max-width: 460px; max-height: min(65vh, 480px); }
+    .mcp-tool-desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+    .mcp-tool-row.expanded .mcp-tool-desc {
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+      white-space: pre-line;
+    }
+    .mcp-tool-row.expanded .mcp-tool-chevron { transform: rotate(180deg); }
+    .mcp-tool-row:focus-visible { outline: 2px solid #7c6aff; outline-offset: -2px; }
+    html:not(.dark) .mcp-tool-row:focus-visible { outline-color: #5b4fcf; }
+
+    /* Fade the bottom edge only while there is more content to scroll to. */
+    #mcp-tools-list.can-scroll {
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+    }
+
     /* Collapsible tool call */
     .tool-call-header { cursor: pointer; user-select: none; }
     .tool-call-header .chevron { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; color: #6b7280; margin-left: auto; }
@@ -391,27 +417,23 @@
 </div>
 
 <!-- MCP Tools Modal -->
-<div id="modal-mcp-tools" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-  <div class="bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto animate-slide-up">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
-      <h3 id="modal-mcp-tools-title" class="font-semibold text-white text-lg">Tools</h3>
-      <button onclick="closeMCPToolsModal()" class="text-gray-500 hover:text-white transition-colors text-xl leading-none">×</button>
+<div id="modal-mcp-tools" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+  role="dialog" aria-modal="true" aria-labelledby="modal-mcp-tools-title">
+  <div class="mcp-tools-panel bg-[#1e2536] border border-[#30363d] rounded-2xl shadow-2xl pointer-events-auto animate-slide-up flex flex-col overflow-hidden">
+    <div class="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-[#30363d]">
+      <div class="min-w-0 flex-1">
+        <h3 id="modal-mcp-tools-title" class="font-semibold text-white text-base leading-tight">MCP Tools</h3>
+        <p id="modal-mcp-tools-subtitle" class="mt-0.5 truncate text-[11px] text-gray-500"></p>
+      </div>
+      <span id="modal-mcp-tools-count" class="mt-0.5 shrink-0 rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">0 tools</span>
+      <button type="button" onclick="closeMCPToolsModal()" aria-label="Close"
+        class="shrink-0 -mt-0.5 text-xl leading-none text-gray-500 hover:text-white transition-colors">×</button>
     </div>
-    <div class="px-6 py-4">
-      <div id="mcp-tools-table-wrap" class="overflow-y-auto max-h-80">
-        <table class="w-full text-sm border-collapse">
-          <thead>
-            <tr class="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-[#30363d]">
-              <th class="text-left pb-2 pr-4 w-1/3">Name</th>
-              <th class="text-left pb-2">Description</th>
-            </tr>
-          </thead>
-          <tbody id="mcp-tools-table-body"></tbody>
-        </table>
-      </div>
-      <div class="flex justify-end pt-4 py-4">
-        <button type="button" onclick="closeMCPToolsModal()" class="bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-2 px-5 rounded-xl transition-colors text-sm">Close</button>
-      </div>
+    <div id="mcp-tools-list" class="min-h-0 flex-1 overflow-y-auto px-2 py-2"></div>
+    <div class="flex items-center justify-between gap-3 border-t border-[#30363d] px-4 py-2">
+      <span id="mcp-tools-hint" class="hidden text-[11px] text-gray-500">Click a tool for the full description</span>
+      <button type="button" onclick="closeMCPToolsModal()"
+        class="ml-auto bg-[#252d3d] hover:bg-[#30363d] text-gray-300 font-semibold py-1.5 px-4 rounded-xl transition-colors text-xs">Close</button>
     </div>
   </div>
 </div>
@@ -535,7 +557,10 @@ function openModal(id) {
 }
 function closeModal() {
   document.getElementById('modal-backdrop').classList.add('hidden');
-  document.querySelectorAll('[id^="modal-"]').forEach(m => {
+  // Only hide the modal containers themselves (direct children of <body>).
+  // Using a bare [id^="modal-"] selector would also hide nested elements such
+  // as #modal-mcp-tools-title, leaving the dialog header permanently blank.
+  document.querySelectorAll('body > [id^="modal-"]').forEach(m => {
     if (m.id !== 'modal-backdrop') m.classList.add('hidden');
   });
 }
@@ -1267,21 +1292,95 @@ async function editMCPServer(id) {
 function showMCPToolsModal(id) {
   const s = state.mcpServers.find(x => x.id === id);
   if (!s) return;
-  document.getElementById('modal-mcp-tools-title').textContent = `Tools — ${s.name}`;
-  const tbody = document.getElementById('mcp-tools-table-body');
   const tools = s.tools || [];
+
+  document.getElementById('modal-mcp-tools-title').textContent = 'MCP Tools';
+  document.getElementById('modal-mcp-tools-subtitle').textContent = s.name || 'MCP server';
+  document.getElementById('modal-mcp-tools-count').textContent =
+    `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
+
+  const list = document.getElementById('mcp-tools-list');
   if (tools.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="2" class="py-4 text-center text-gray-500 text-xs">No tools available</td></tr>';
+    list.innerHTML = `
+      <div class="flex flex-col items-center justify-center gap-1 py-8 text-center">
+        <span class="text-2xl opacity-60">🔧</span>
+        <p class="text-xs text-gray-500">No tools discovered</p>
+        <p class="text-[11px] text-gray-600">Try refreshing this MCP server.</p>
+      </div>`;
   } else {
-    tbody.innerHTML = tools.map(t => `
-      <tr class="border-b border-[#30363d] last:border-0">
-        <td class="py-2 pr-4 font-semibold text-gray-200 text-xs align-top">${escapeHtml(t.name || '')}</td>
-        <td class="py-2 text-gray-400 text-xs align-top">${t.description ? escapeHtml(t.description) : '<span class="text-gray-600">—</span>'}</td>
-      </tr>
-    `).join('');
+    list.innerHTML = tools.map(t => {
+      const name = escapeHtml(String(t.name || 'Unnamed tool'));
+      const desc = typeof t.description === 'string' ? t.description.trim() : '';
+      const descHtml = desc
+        ? escapeHtml(desc)
+        : '<span class="text-gray-600">No description</span>';
+      return `
+        <div class="mcp-tool-row group rounded-xl px-3 py-2 transition-colors hover:bg-[#252d3d]">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <code class="min-w-0 truncate font-mono text-[12px] font-semibold text-gray-200" title="${name}">${name}</code>
+              <svg class="mcp-tool-chevron ml-auto hidden h-3 w-3 shrink-0 text-gray-500 transition-transform duration-200"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <p class="mcp-tool-desc mt-0.5 text-[11px] leading-relaxed text-gray-500">${descHtml}</p>
+          </div>
+        </div>`;
+    }).join('');
   }
+
   openModal('mcp-tools');
+  list.scrollTop = 0;
+
+  // Detect descriptions that are visually clamped (works for CJK too) and make
+  // only those rows expandable. Runs after the modal is laid out.
+  requestAnimationFrame(() => {
+    let hasExpandable = false;
+    list.querySelectorAll('.mcp-tool-row').forEach(row => {
+      const descEl = row.querySelector('.mcp-tool-desc');
+      if (!descEl || descEl.scrollHeight <= descEl.clientHeight + 1) return;
+      hasExpandable = true;
+      row.classList.add('expandable', 'cursor-pointer');
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.setAttribute('aria-expanded', 'false');
+      const chevron = row.querySelector('.mcp-tool-chevron');
+      if (chevron) chevron.classList.remove('hidden');
+    });
+    document.getElementById('mcp-tools-hint').classList.toggle('hidden', !hasExpandable);
+    updateMCPToolsFade();
+  });
 }
+
+function updateMCPToolsFade() {
+  const list = document.getElementById('mcp-tools-list');
+  if (!list) return;
+  const canScroll = list.scrollHeight > list.clientHeight + 1;
+  const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 2;
+  list.classList.toggle('can-scroll', canScroll && !atBottom);
+}
+
+function toggleMCPToolRow(row) {
+  if (!row || !row.classList.contains('expandable')) return;
+  const expanded = row.classList.toggle('expanded');
+  row.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  requestAnimationFrame(updateMCPToolsFade);
+}
+
+document.getElementById('mcp-tools-list').addEventListener('click', e => {
+  const row = e.target.closest('.mcp-tool-row');
+  if (row) toggleMCPToolRow(row);
+});
+
+document.getElementById('mcp-tools-list').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.mcp-tool-row');
+  if (!row || !row.classList.contains('expandable')) return;
+  e.preventDefault();
+  toggleMCPToolRow(row);
+});
+
+document.getElementById('mcp-tools-list').addEventListener('scroll', updateMCPToolsFade, { passive: true });
 
 function closeMCPToolsModal() {
   closeModal();
